@@ -1,33 +1,30 @@
 import ballerina/log;
 import ballerina/websubhub;
 
-websubhub:TopicRegistration[] hubTopics = [];
-Subscriber[] hubSubscribers = [];
-
 function init() returns error? {
     log:print("Starting hub-service initialization");
     
-    check initializeHubTopics();
+    websubhub:TopicRegistration[] availableTopics = check getAvailableTopics();
 
-    check initializeSubscriptions();
+    Subscriber[] availableSubscribers = check getAvailableSubscribers();
 
-    check replayTopicRegistrations();
+    check replayTopicRegistrations(availableTopics);
 
-    check replaySubscriptions();
+    check replaySubscriptions(availableSubscribers);
 
     check hubListener.attach(<websubhub:Service>hubService, "hub");
 
     check hubListener.'start();
 }
 
-function replayTopicRegistrations() returns error? {
-    foreach var topic in hubTopics {
+function replayTopicRegistrations(websubhub:TopicRegistration[] topics) returns error? {
+    foreach var topic in topics {
         registerTopic(topic, false);
     }
 }
 
-function replaySubscriptions() returns error? {
-    foreach var subscriber in hubSubscribers {
+function replaySubscriptions(Subscriber[] subscribers) returns error? {
+    foreach var subscriber in subscribers {
         websubhub:VerifiedSubscription subscription = getSubscription(subscriber);
         check subscribe(subscription, false);
     }
