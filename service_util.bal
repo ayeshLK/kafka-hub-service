@@ -15,17 +15,29 @@ kafka:ProducerConfiguration mainProducerConfig = {
     retryCount: 3
 };
 
-kafka:Producer mainProducer = check new (mainProducerConfig);
+kafka:Producer mainProducer = checkpanic new (mainProducerConfig);
 
-function registerTopic(websubhub:TopicRegistration message) {
+function registerTopic(websubhub:TopicRegistration message, boolean persist = true) {
     string topicId = crypto:hashSha1(message.topic.toBytes()).toBase64();
     registeredTopics[topicId] = message.topic;
+    
+    if (persist) {
+        var persistingResult = persistTopicRegistrations(message);
+        if (persistingResult is error) {
+            log:printError("Error occurred while persisting the topic-registration ", err = persistingResult);
+        }
+    }
 }
 
 function deregisterTopic(websubhub:TopicDeregistration message) {
     string topicId = crypto:hashSha1(message.topic.toBytes()).toBase64();
     if (registeredTopics.hasKey(topicId)) {
         string deletedTopic = registeredTopics.remove(topicId);
+    }
+
+    var persistingResult = persistTopicDeregistration(message);
+    if (persistingResult is error) {
+        log:printError("Error occurred while persisting the topic-deregistration ", err = persistingResult);
     }
 }
 
@@ -56,13 +68,20 @@ function validateSubscription(websubhub:Subscription message) returns websubhub:
     }
 }
 
-function subscribe(websubhub:VerifiedSubscription message) returns error? {
+function subscribe(websubhub:VerifiedSubscription message, boolean persist = true) returns error? {
     string topicName = generateTopicName(message.hubTopic);
     string groupId = generateGroupId(message.hubTopic, message.hubCallback);
     kafka:Consumer consumerEp = check getConsumer([ topicName ], groupId, false);
     websubhub:HubClient hubClientEp = check new (message);
     var result = start notifySubscriber(hubClientEp, consumerEp);
-    // registeredConsumers[groupId] = result;
+    registeredConsumers[groupId] = result;
+
+    if (persist) {
+        var persistingResult = persistSubscription(message);
+        if (persistingResult is error) {
+            log:printError("Error occurred while persisting the subscription ", err = persistingResult);
+        }    
+    }
 }
 
 function notifySubscriber(websubhub:HubClient clientEp, kafka:Consumer consumerEp) returns error? {
@@ -85,7 +104,7 @@ function notifySubscriber(websubhub:HubClient clientEp, kafka:Consumer consumerE
                 var publishResponse = clientEp->notifyContentDistribution(distributionMsg);
 
                 if (publishResponse is error) {
-                    log:print("Error occurred while sending notification to subscriber ", err = publishResponse.message());
+                    log:printError("Error occurred while sending notification to subscriber ", err = publishResponse);
                 } else {
                     _ = check consumerEp->commit();
                 }
@@ -116,5 +135,10 @@ function unsubscribe(websubhub:VerifiedUnsubscription message) returns error? {
     if (registeredConsumer is future<error?>) {
          _ = registeredConsumer.cancel();
         var result = registeredConsumers.remove(groupId);
-    }    
+    }  
+
+    var persistingResult = persistUnsubscription(message);
+    if (persistingResult is error) {
+        log:printError("Error occurred while persisting the unsubscription ", err = persistingResult);
+    }  
 }

@@ -1,7 +1,9 @@
 import ballerina/websubhub;
 import ballerina/log;
 
-service /hub on new websubhub:Listener(9090) {
+listener websubhub:Listener hubListener = new websubhub:Listener(9090);
+
+websubhub:Service hubService = service object {
     remote function onRegisterTopic(websubhub:TopicRegistration message)
                                 returns websubhub:TopicRegistrationSuccess|websubhub:TopicRegistrationError {
         log:print("Received topic-registration request ", request = message);
@@ -78,4 +80,4 @@ service /hub on new websubhub:Listener(9090) {
 
         var result = unsubscribe(msg);
     }
-}
+};
