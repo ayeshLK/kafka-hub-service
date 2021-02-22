@@ -5,18 +5,6 @@ import ballerina/log;
 import ballerina/mime;
 import ballerina/lang.value;
 
-map<string> registeredTopics = {};
-map<future<error?>> registeredConsumers = {};
-
-kafka:ProducerConfiguration mainProducerConfig = {
-    bootstrapServers: "localhost:9092",
-    clientId: "main-producer",
-    acks: "1",
-    retryCount: 3
-};
-
-kafka:Producer mainProducer = checkpanic new (mainProducerConfig);
-
 function registerTopic(websubhub:TopicRegistration message, boolean persist = true) {
     string topicId = crypto:hashSha1(message.topic.toBytes()).toBase64();
     registeredTopics[topicId] = message.topic;
@@ -26,18 +14,6 @@ function registerTopic(websubhub:TopicRegistration message, boolean persist = tr
         if (persistingResult is error) {
             log:printError("Error occurred while persisting the topic-registration ", err = persistingResult);
         }
-    }
-}
-
-function deregisterTopic(websubhub:TopicDeregistration message) {
-    string topicId = crypto:hashSha1(message.topic.toBytes()).toBase64();
-    if (registeredTopics.hasKey(topicId)) {
-        string deletedTopic = registeredTopics.remove(topicId);
-    }
-
-    var persistingResult = persistTopicDeregistration(message);
-    if (persistingResult is error) {
-        log:printError("Error occurred while persisting the topic-deregistration ", err = persistingResult);
     }
 }
 
@@ -58,13 +34,6 @@ function publishContent(websubhub:UpdateMessage message) returns error? {
         check mainProducer->flushRecords();
     } else {
         return error websubhub:UpdateMessageError("Topic [" + message.hubTopic + "] is not registered with the Hub");
-    }
-}
-
-function validateSubscription(websubhub:Subscription message) returns websubhub:SubscriptionDeniedError? {
-    string topicId = crypto:hashSha1(message.hubTopic.toBytes()).toBase64();
-    if (!registeredTopics.hasKey(topicId)) {
-        return error websubhub:SubscriptionDeniedError("Topic [" + message.hubTopic + "] is not registered with the Hub");
     }
 }
 
@@ -114,31 +83,4 @@ function notifySubscriber(websubhub:HubClient clientEp, kafka:Consumer consumerE
             }
         }
     }
-}
-
-function validateUnsubscription(websubhub:Unsubscription message) returns websubhub:UnsubscriptionDeniedError? {
-    string topicId = crypto:hashSha1(message.hubTopic.toBytes()).toBase64();
-    if (!registeredTopics.hasKey(topicId)) {
-        return error websubhub:UnsubscriptionDeniedError("Topic [" + message.hubTopic + "] is not registered with the Hub");
-    } else {
-        string groupId = generateGroupId(message.hubTopic, message.hubCallback);
-        if (!registeredConsumers.hasKey(groupId)) {
-            return error websubhub:UnsubscriptionDeniedError("Could not find a valid subscriber for Topic [" 
-                                + message.hubTopic + "] and Callback [" + message.hubCallback + "]");
-        }
-    }    
-}
-
-function unsubscribe(websubhub:VerifiedUnsubscription message) returns error? {
-    string groupId = generateGroupId(message.hubTopic, message.hubCallback);
-    var registeredConsumer = registeredConsumers[groupId];
-    if (registeredConsumer is future<error?>) {
-         _ = registeredConsumer.cancel();
-        var result = registeredConsumers.remove(groupId);
-    }  
-
-    var persistingResult = persistUnsubscription(message);
-    if (persistingResult is error) {
-        log:printError("Error occurred while persisting the unsubscription ", err = persistingResult);
-    }  
 }
