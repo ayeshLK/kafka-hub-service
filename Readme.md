@@ -6,3 +6,14 @@
 
 * Ballerina SwanLake SL-Alpha 2
 * Apache Kafka 2.7.0
+
+## How to Deploy ##
+
+* [Start Apache Kafka message broker](./Kafka-Startup-Guide.md).
+
+* Build and run the project.
+
+```ballerina
+    bal run .
+```
+
