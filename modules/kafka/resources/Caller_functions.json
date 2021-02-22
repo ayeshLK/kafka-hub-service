@@ -1,1 +1,0 @@
-{"ballerinax/kafka:2.1.0-alpha4" : [{"function":{"name":"commit","requiredParams":[],"returnType":"ballerinax/kafka:2.1.0-alpha4:ConsumerError"}},{"function":{"name":"commitOffset","requiredParams":[{"offsets":"ballerinax/kafka:2.1.0-alpha4:PartitionOffset[]"},{"duration":"int"}],"returnType":"ballerinax/kafka:2.1.0-alpha4:ConsumerError"}}]}
