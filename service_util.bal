@@ -5,27 +5,15 @@ import ballerina/log;
 import ballerina/mime;
 import ballerina/lang.value;
 
-map<string> registeredTopics = {};
-map<future<error?>> registeredConsumers = {};
-
-kafka:ProducerConfiguration mainProducerConfig = {
-    bootstrapServers: "localhost:9092",
-    clientId: "main-producer",
-    acks: "1",
-    retryCount: 3
-};
-
-kafka:Producer mainProducer = check new (mainProducerConfig);
-
-function registerTopic(websubhub:TopicRegistration message) {
+function registerTopic(websubhub:TopicRegistration message, boolean persist = true) {
     string topicId = crypto:hashSha1(message.topic.toBytes()).toBase64();
     registeredTopics[topicId] = message.topic;
-}
-
-function deregisterTopic(websubhub:TopicDeregistration message) {
-    string topicId = crypto:hashSha1(message.topic.toBytes()).toBase64();
-    if (registeredTopics.hasKey(topicId)) {
-        string deletedTopic = registeredTopics.remove(topicId);
+    
+    if (persist) {
+        var persistingResult = persistTopicRegistrations(message);
+        if (persistingResult is error) {
+            log:printError("Error occurred while persisting the topic-registration ", err = persistingResult);
+        }
     }
 }
 
@@ -49,20 +37,20 @@ function publishContent(websubhub:UpdateMessage message) returns error? {
     }
 }
 
-function validateSubscription(websubhub:Subscription message) returns websubhub:SubscriptionDeniedError? {
-    string topicId = crypto:hashSha1(message.hubTopic.toBytes()).toBase64();
-    if (!registeredTopics.hasKey(topicId)) {
-        return error websubhub:SubscriptionDeniedError("Topic [" + message.hubTopic + "] is not registered with the Hub");
-    }
-}
-
-function subscribe(websubhub:VerifiedSubscription message) returns error? {
+function subscribe(websubhub:VerifiedSubscription message, boolean persist = true) returns error? {
     string topicName = generateTopicName(message.hubTopic);
     string groupId = generateGroupId(message.hubTopic, message.hubCallback);
     kafka:Consumer consumerEp = check getConsumer([ topicName ], groupId, false);
     websubhub:HubClient hubClientEp = check new (message);
     var result = start notifySubscriber(hubClientEp, consumerEp);
-    // registeredConsumers[groupId] = result;
+    registeredConsumers[groupId] = result;
+
+    if (persist) {
+        var persistingResult = persistSubscription(message);
+        if (persistingResult is error) {
+            log:printError("Error occurred while persisting the subscription ", err = persistingResult);
+        }    
+    }
 }
 
 function notifySubscriber(websubhub:HubClient clientEp, kafka:Consumer consumerEp) returns error? {
@@ -85,7 +73,7 @@ function notifySubscriber(websubhub:HubClient clientEp, kafka:Consumer consumerE
                 var publishResponse = clientEp->notifyContentDistribution(distributionMsg);
 
                 if (publishResponse is error) {
-                    log:print("Error occurred while sending notification to subscriber ", err = publishResponse.message());
+                    log:printError("Error occurred while sending notification to subscriber ", err = publishResponse);
                 } else {
                     _ = check consumerEp->commit();
                 }
@@ -95,26 +83,4 @@ function notifySubscriber(websubhub:HubClient clientEp, kafka:Consumer consumerE
             }
         }
     }
-}
-
-function validateUnsubscription(websubhub:Unsubscription message) returns websubhub:UnsubscriptionDeniedError? {
-    string topicId = crypto:hashSha1(message.hubTopic.toBytes()).toBase64();
-    if (!registeredTopics.hasKey(topicId)) {
-        return error websubhub:UnsubscriptionDeniedError("Topic [" + message.hubTopic + "] is not registered with the Hub");
-    } else {
-        string groupId = generateGroupId(message.hubTopic, message.hubCallback);
-        if (!registeredConsumers.hasKey(groupId)) {
-            return error websubhub:UnsubscriptionDeniedError("Could not find a valid subscriber for Topic [" 
-                                + message.hubTopic + "] and Callback [" + message.hubCallback + "]");
-        }
-    }    
-}
-
-function unsubscribe(websubhub:VerifiedUnsubscription message) returns error? {
-    string groupId = generateGroupId(message.hubTopic, message.hubCallback);
-    var registeredConsumer = registeredConsumers[groupId];
-    if (registeredConsumer is future<error?>) {
-         _ = registeredConsumer.cancel();
-        var result = registeredConsumers.remove(groupId);
-    }    
 }
