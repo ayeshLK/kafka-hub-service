@@ -4,7 +4,7 @@
 
 ## Prerequisites ##
 
-* Ballerina SwanLake SL-Alpha 2
+* Ballerina SwanLake SL-Alpha 2+
 * Apache Kafka 2.7.0
 
 ## How to Deploy ##
