@@ -15,3 +15,5 @@
 ```sh
     ./bin/kafka-server-start.sh config/server.properties
 ```
+
+* For more information on **Apache Kafka** go through [following guides](https://kafka.apache.org/quickstart).
