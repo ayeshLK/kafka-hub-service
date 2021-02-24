@@ -13,7 +13,7 @@
 
 * Build and run the project.
 
-```ballerina
+```bash
     bal run .
 ```
 
