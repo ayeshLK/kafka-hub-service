@@ -6,7 +6,7 @@ public function main() returns error? {
     
     websubhub:TopicRegistration[] availableTopics = check getAvailableTopics();
 
-    Subscriber[] availableSubscribers = check getAvailableSubscribers();
+    websubhub:VerifiedSubscription[] availableSubscribers = check getAvailableSubscribers();
 
     check replayTopicRegistrations(availableTopics);
 
@@ -23,9 +23,8 @@ function replayTopicRegistrations(websubhub:TopicRegistration[] topics) returns 
     }
 }
 
-function replaySubscriptions(Subscriber[] subscribers) returns error? {
-    foreach var subscriber in subscribers {
-        websubhub:VerifiedSubscription subscription = getSubscription(subscriber);
+function replaySubscriptions(websubhub:VerifiedSubscription[] subscriptions) returns error? {
+    foreach var subscription in subscriptions {
         check subscribe(subscription, false);
     }
 }

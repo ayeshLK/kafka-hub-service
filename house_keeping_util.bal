@@ -51,22 +51,21 @@ function persistTopicDeregistration(websubhub:TopicDeregistration message) retur
 }
 
 function persistSubscription(websubhub:VerifiedSubscription message) returns error? {
-    Subscriber[] subscribers = check getAvailableSubscribers();
-    Subscriber subscriber = getSubscriber(message);
-    subscribers.push(subscriber);
-    json[] jsonData = subscribers;
+    websubhub:VerifiedSubscription[] subscriptions = check getAvailableSubscribers();
+    subscriptions.push(message);
+    json[] jsonData = <json[]> subscriptions.toJson();
     check publishHousekeepingData(REGISTERED_CONSUMERS, jsonData);
 }
 
 function persistUnsubscription(websubhub:VerifiedUnsubscription message) returns error? {
-    Subscriber[] subscribers = check getAvailableSubscribers();
+    websubhub:VerifiedUnsubscription[] subscriptions = check getAvailableSubscribers();
 
-    subscribers = 
-        from var subscriber in subscribers
-        where subscriber.hubTopic != message.hubTopic && subscriber.hubCallback != message.hubCallback
-        select subscriber;
+    subscriptions = 
+        from var subscription in subscriptions
+        where subscription.hubTopic != message.hubTopic && subscription.hubCallback != message.hubCallback
+        select subscription;
     
-    json[] jsonData = subscribers;
+    json[] jsonData = <json[]> subscriptions.toJson();
 
     check publishHousekeepingData(REGISTERED_CONSUMERS, jsonData);
 }
@@ -107,10 +106,10 @@ function getAvailableTopics() returns websubhub:TopicRegistration[]|error {
     return currentTopics;
 }
 
-function getAvailableSubscribers() returns Subscriber[]|error {
+function getAvailableSubscribers() returns websubhub:VerifiedSubscription[]|error {
     kafka:ConsumerRecord[] records = check subscriberDetailsConsumer->poll(1000);
 
-    Subscriber[] currentSubscribers = [];
+    websubhub:VerifiedSubscription[] currentSubscriptions = [];
 
     if (records.length() > 0) {
         kafka:ConsumerRecord lastRecord = records.pop();
@@ -122,13 +121,13 @@ function getAvailableSubscribers() returns Subscriber[]|error {
             json[] payload =  <json[]> check value:fromJsonString(lastPersistedData);
             
             foreach var data in payload {
-                Subscriber subscriber = check data.cloneWithType(Subscriber);
-                currentSubscribers.push(subscriber);
+                websubhub:VerifiedSubscription subscription = check data.cloneWithType(websubhub:VerifiedSubscription);
+                currentSubscriptions.push(subscription);
             }
         } else {
             log:printError("Error occurred while retrieving subscriber-data ", err = lastPersistedData);
         }
     }
 
-    return currentSubscribers;  
+    return currentSubscriptions;  
 }
