@@ -3,16 +3,6 @@ import ballerinax/kafka;
 const string TOPIC_PREFIX = "topic_";
 const string GROUP_PREFIX = "consumer_group_";
 
-public type Subscriber record {|
-    string hub;
-    string hubMode;
-    string hubCallback;
-    string hubTopic;
-    string? hubLeaseSeconds = ();
-    string? hubSecret = ();
-    boolean verificationSuccess;
-|};
-
 isolated function generateTopicName(string topic) returns string {
     return TOPIC_PREFIX + getStringHash(topic).toString();
 }
