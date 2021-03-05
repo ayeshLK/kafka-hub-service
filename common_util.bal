@@ -1,7 +1,6 @@
 import ballerinax/kafka;
 import ballerina/time;
 import ballerina/jwt;
-import ballerina/log;
 
 const string TOPIC_PREFIX = "topic_";
 const string GROUP_PREFIX = "consumer_group_";

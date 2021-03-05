@@ -53,44 +53,74 @@ websubhub:Service hubService = service object {
         }
     }
 
-    remote function onDeregisterTopic(websubhub:TopicDeregistration message)
+    remote function onDeregisterTopic(websubhub:TopicDeregistration message, http:Headers headers)
                         returns websubhub:TopicDeregistrationSuccess|websubhub:TopicDeregistrationError {
-        log:print("Received topic-deregistration request ", request = message);
-        
-        string topicId = crypto:hashSha1(message.topic.toBytes()).toBase64();
-        if (registeredTopics.hasKey(topicId)) {
-            string deletedTopic = registeredTopics.remove(topicId);
+        var authHeader = headers.getHeader(http:AUTH_HEADER);
+        if (authHeader is string) {
+            jwt:Payload|http:Unauthorized auth = handler.authenticate(authHeader);
+            if (auth is jwt:Payload && validateJwt(auth, ["deregister_topic"])) {
+                log:print("Received topic-deregistration request ", request = message);
+                string topicId = crypto:hashSha1(message.topic.toBytes()).toBase64();
+                if (registeredTopics.hasKey(topicId)) {
+                    string deletedTopic = registeredTopics.remove(topicId);
+                }
+                var persistingResult = persistTopicDeregistration(message);
+                if (persistingResult is error) {
+                    log:printError("Error occurred while persisting the topic-deregistration ", err = persistingResult);
+                }
+                return {};
+            } else {
+                log:printError("Authentication credentials invalid");
+                return error websubhub:TopicDeregistrationError("Not authorized");   
+            }
+        } else {
+            log:printError("Authorization header not found");
+            return error websubhub:TopicDeregistrationError("Not authorized");
         }
-
-        var persistingResult = persistTopicDeregistration(message);
-        if (persistingResult is error) {
-            log:printError("Error occurred while persisting the topic-deregistration ", err = persistingResult);
-        }
-
-        return {};
     }
 
-    remote function onUpdateMessage(websubhub:UpdateMessage msg)
-               returns websubhub:Acknowledgement|websubhub:UpdateMessageError {        
-        log:print("Received content-update request ", request = msg.toString());
-
-        error? errorResponse = publishContent(msg);
-
-        if (errorResponse is websubhub:UpdateMessageError) {
-            return errorResponse;
-        } else if (errorResponse is error) {
-            log:printError("Error occurred while publishing the content ", errorMessage = errorResponse.message());
-            return error websubhub:UpdateMessageError(errorResponse.message());
+    remote function onUpdateMessage(websubhub:UpdateMessage msg, http:Headers headers)
+               returns websubhub:Acknowledgement|websubhub:UpdateMessageError {   
+        var authHeader = headers.getHeader(http:AUTH_HEADER);
+        if (authHeader is string) {
+            jwt:Payload|http:Unauthorized auth = handler.authenticate(authHeader);
+            if (auth is jwt:Payload && validateJwt(auth, ["update_content"])) {
+                log:print("Received content-update request ", request = msg.toString());
+                error? errorResponse = publishContent(msg);
+                if (errorResponse is websubhub:UpdateMessageError) {
+                    return errorResponse;
+                } else if (errorResponse is error) {
+                    log:printError("Error occurred while publishing the content ", errorMessage = errorResponse.message());
+                    return error websubhub:UpdateMessageError(errorResponse.message());
+                } else {
+                    return {};
+                }
+            } else {
+                log:printError("Authentication credentials invalid");
+                return error websubhub:UpdateMessageError("Not authorized");   
+            }
         } else {
-            return {};
+            log:printError("Authorization header not found");
+            return error websubhub:UpdateMessageError("Not authorized");
         }
     }
     
-    remote function onSubscription(websubhub:Subscription message)
-                returns websubhub:SubscriptionAccepted {
-        log:print("Received subscription-request ", request = message.toString());
-        
-        return {};
+    remote function onSubscription(websubhub:Subscription message, http:Headers headers)
+                returns websubhub:SubscriptionAccepted|websubhub:BadSubscriptionError {
+        var authHeader = headers.getHeader(http:AUTH_HEADER);
+        if (authHeader is string) {
+            jwt:Payload|http:Unauthorized auth = handler.authenticate(authHeader);
+            if (auth is jwt:Payload && validateJwt(auth, ["subscribe"])) {
+                log:print("Received subscription-request ", request = message.toString());
+                return {};
+            } else {
+                log:printError("Authentication credentials invalid");
+                return error websubhub:BadSubscriptionError("Not authorized");   
+            }
+        } else {
+            log:printError("Authorization header not found");
+            return error websubhub:BadSubscriptionError("Not authorized");
+        }
     }
 
     remote function onSubscriptionValidation(websubhub:Subscription message)
@@ -109,11 +139,22 @@ websubhub:Service hubService = service object {
         var result = subscribe(message);
     }
 
-    remote function onUnsubscription(websubhub:Unsubscription message)
+    remote function onUnsubscription(websubhub:Unsubscription message, http:Headers headers)
                returns websubhub:UnsubscriptionAccepted|websubhub:BadUnsubscriptionError|websubhub:InternalUnsubscriptionError {
-        log:print("Received unsubscription request ", request = message.toString());
-
-        return {};
+        var authHeader = headers.getHeader(http:AUTH_HEADER);
+        if (authHeader is string) {
+            jwt:Payload|http:Unauthorized auth = handler.authenticate(authHeader);
+            if (auth is jwt:Payload && validateJwt(auth, ["subscribe"])) {
+                log:print("Received unsubscription request ", request = message.toString());
+                return {};
+            } else {
+                log:printError("Authentication credentials invalid");
+                return error websubhub:BadUnsubscriptionError("Not authorized");   
+            }
+        } else {
+            log:printError("Authorization header not found");
+            return error websubhub:BadUnsubscriptionError("Not authorized");
+        }
     }
 
     remote function onUnsubscriptionValidation(websubhub:Unsubscription message)
