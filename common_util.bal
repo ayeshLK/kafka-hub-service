@@ -1,4 +1,7 @@
 import ballerinax/kafka;
+import ballerina/time;
+import ballerina/jwt;
+import ballerina/log;
 
 const string TOPIC_PREFIX = "topic_";
 const string GROUP_PREFIX = "consumer_group_";
@@ -32,4 +35,26 @@ function getConsumer(string[] topics, string consumerGroupId, boolean autoCommit
     };
 
     return check new (consumerConfiguration);
+}
+
+isolated function validateJwt(jwt:Payload authDetails, string[] validScopes) returns boolean {
+    time:Time now = time:currentTime();
+    int? expiryTime = authDetails?.exp;
+    if (expiryTime is int && expiryTime > (now.time / 1000)) {
+        if (validScopes.length() > 0) {
+            var availableScope = authDetails["scope"];
+            if (availableScope is string) {
+                foreach var scope in validScopes {
+                    if (scope == availableScope) {
+                        return true;
+                    } 
+                }
+            } else {
+                return false;
+            }
+        } else {
+            return true;
+        }
+    }
+    return false;
 }

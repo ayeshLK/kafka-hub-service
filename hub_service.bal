@@ -2,6 +2,8 @@ import ballerina/websubhub;
 import ballerina/crypto;
 import ballerina/log;
 import ballerinax/kafka;
+import ballerina/http;
+import ballerina/jwt;
 
 map<string> registeredTopics = {};
 map<future<error?>> registeredConsumers = {};
@@ -17,14 +19,38 @@ kafka:Producer mainProducer = checkpanic new (mainProducerConfig);
 
 listener websubhub:Listener hubListener = new websubhub:Listener(9090);
 
+http:JwtValidatorConfig config = {
+    audience: "[<client-id1>, <client-id2>]",
+    signatureConfig: {
+        trustStoreConfig: {
+            trustStore: {
+                path: "<trust-store-path>",
+                password: "<trust-store-password>"
+            },
+            certAlias: "<trust-store-alias>"
+        }
+    }
+};
+http:ListenerJwtAuthHandler handler = new(config);
+
 websubhub:Service hubService = service object {
-    remote function onRegisterTopic(websubhub:TopicRegistration message)
+    remote function onRegisterTopic(websubhub:TopicRegistration message, http:Headers headers)
                                 returns websubhub:TopicRegistrationSuccess|websubhub:TopicRegistrationError {
-        log:print("Received topic-registration request ", request = message);
-
-        registerTopic(message);
-
-        return {};
+        var authHeader = headers.getHeader(http:AUTH_HEADER);
+        if (authHeader is string) {
+            jwt:Payload|http:Unauthorized auth = handler.authenticate(authHeader);
+            if (auth is jwt:Payload && validateJwt(auth, ["register_topic"])) {
+                log:print("Received topic-registration request ", request = message);
+                registerTopic(message);
+                return {};
+            } else {
+                log:printError("Authentication credentials invalid");
+                return error websubhub:TopicRegistrationError("Not authorized");   
+            }
+        } else {
+            log:printError("Authorization header not found");
+            return error websubhub:TopicRegistrationError("Not authorized");
+        }
     }
 
     remote function onDeregisterTopic(websubhub:TopicDeregistration message)
