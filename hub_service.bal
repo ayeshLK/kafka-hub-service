@@ -42,7 +42,7 @@ websubhub:Service hubService = service object {
             if (auth is jwt:Payload && validateJwt(auth, ["register_topic"])) {
                 log:print("Received topic-registration request ", request = message);
                 registerTopic(message);
-                return {};
+                return websubhub:TOPIC_REGISTRATION_SUCCESS;
             } else {
                 log:printError("Authentication credentials invalid");
                 return error websubhub:TopicRegistrationError("Not authorized");   
@@ -68,7 +68,7 @@ websubhub:Service hubService = service object {
                 if (persistingResult is error) {
                     log:printError("Error occurred while persisting the topic-deregistration ", err = persistingResult);
                 }
-                return {};
+                return websubhub:TOPIC_DEREGISTRATION_SUCCESS;
             } else {
                 log:printError("Authentication credentials invalid");
                 return error websubhub:TopicDeregistrationError("Not authorized");   
@@ -93,7 +93,7 @@ websubhub:Service hubService = service object {
                     log:printError("Error occurred while publishing the content ", errorMessage = errorResponse.message());
                     return error websubhub:UpdateMessageError(errorResponse.message());
                 } else {
-                    return {};
+                    return websubhub:ACKNOWLEDGEMENT;
                 }
             } else {
                 log:printError("Authentication credentials invalid");
@@ -112,7 +112,7 @@ websubhub:Service hubService = service object {
             jwt:Payload|http:Unauthorized auth = handler.authenticate(authHeader);
             if (auth is jwt:Payload && validateJwt(auth, ["subscribe"])) {
                 log:print("Received subscription-request ", request = message.toString());
-                return {};
+                return websubhub:SUBSCRIPTION_ACCEPTED;
             } else {
                 log:printError("Authentication credentials invalid");
                 return error websubhub:BadSubscriptionError("Not authorized");   
@@ -146,7 +146,7 @@ websubhub:Service hubService = service object {
             jwt:Payload|http:Unauthorized auth = handler.authenticate(authHeader);
             if (auth is jwt:Payload && validateJwt(auth, ["subscribe"])) {
                 log:print("Received unsubscription request ", request = message.toString());
-                return {};
+                return websubhub:UNSUBSCRIPTION_ACCEPTED;
             } else {
                 log:printError("Authentication credentials invalid");
                 return error websubhub:BadUnsubscriptionError("Not authorized");   
