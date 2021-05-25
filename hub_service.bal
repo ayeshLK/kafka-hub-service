@@ -9,13 +9,12 @@ map<string> registeredTopics = {};
 map<future<error?>> registeredConsumers = {};
 
 kafka:ProducerConfiguration mainProducerConfig = {
-    bootstrapServers: "localhost:9092",
     clientId: "main-producer",
     acks: "1",
     retryCount: 3
 };
 
-kafka:Producer mainProducer = checkpanic new (mainProducerConfig);
+kafka:Producer mainProducer = check new ("localhost:9092", mainProducerConfig);
 
 listener websubhub:Listener hubListener = new websubhub:Listener(9090);
 
@@ -40,7 +39,7 @@ websubhub:Service hubService = service object {
         if (authHeader is string) {
             jwt:Payload|http:Unauthorized auth = handler.authenticate(authHeader);
             if (auth is jwt:Payload && validateJwt(auth, ["register_topic"])) {
-                log:print("Received topic-registration request ", request = message);
+                log:printInfo("Received topic-registration request ", request = message);
                 registerTopic(message);
                 return websubhub:TOPIC_REGISTRATION_SUCCESS;
             } else {
@@ -59,14 +58,14 @@ websubhub:Service hubService = service object {
         if (authHeader is string) {
             jwt:Payload|http:Unauthorized auth = handler.authenticate(authHeader);
             if (auth is jwt:Payload && validateJwt(auth, ["deregister_topic"])) {
-                log:print("Received topic-deregistration request ", request = message);
+                log:printInfo("Received topic-deregistration request ", request = message);
                 string topicId = crypto:hashSha1(message.topic.toBytes()).toBase64();
                 if (registeredTopics.hasKey(topicId)) {
                     string deletedTopic = registeredTopics.remove(topicId);
                 }
                 var persistingResult = persistTopicDeregistration(message);
                 if (persistingResult is error) {
-                    log:printError("Error occurred while persisting the topic-deregistration ", err = persistingResult);
+                    log:printError("Error occurred while persisting the topic-deregistration ", err = persistingResult.message());
                 }
                 return websubhub:TOPIC_DEREGISTRATION_SUCCESS;
             } else {
@@ -85,7 +84,7 @@ websubhub:Service hubService = service object {
         if (authHeader is string) {
             jwt:Payload|http:Unauthorized auth = handler.authenticate(authHeader);
             if (auth is jwt:Payload && validateJwt(auth, ["update_content"])) {
-                log:print("Received content-update request ", request = msg.toString());
+                log:printInfo("Received content-update request ", request = msg.toString());
                 error? errorResponse = publishContent(msg);
                 if (errorResponse is websubhub:UpdateMessageError) {
                     return errorResponse;
@@ -111,7 +110,7 @@ websubhub:Service hubService = service object {
         if (authHeader is string) {
             jwt:Payload|http:Unauthorized auth = handler.authenticate(authHeader);
             if (auth is jwt:Payload && validateJwt(auth, ["subscribe"])) {
-                log:print("Received subscription-request ", request = message.toString());
+                log:printInfo("Received subscription-request ", request = message.toString());
                 return websubhub:SUBSCRIPTION_ACCEPTED;
             } else {
                 log:printError("Authentication credentials invalid");
@@ -125,7 +124,7 @@ websubhub:Service hubService = service object {
 
     remote function onSubscriptionValidation(websubhub:Subscription message)
                 returns websubhub:SubscriptionDeniedError? {
-        log:print("Received subscription-validation request ", request = message.toString());
+        log:printInfo("Received subscription-validation request ", request = message.toString());
 
         string topicId = crypto:hashSha1(message.hubTopic.toBytes()).toBase64();
         if (!registeredTopics.hasKey(topicId)) {
@@ -133,10 +132,9 @@ websubhub:Service hubService = service object {
         }
     }
 
-    remote function onSubscriptionIntentVerified(websubhub:VerifiedSubscription message) {
-        log:print("Received subscription-intent-verification request ", request = message.toString());
-
-        var result = subscribe(message);
+    remote function onSubscriptionIntentVerified(websubhub:VerifiedSubscription message) returns error? {
+        log:printInfo("Received subscription-intent-verification request ", request = message.toString());
+        check subscribe(message);
     }
 
     remote function onUnsubscription(websubhub:Unsubscription message, http:Headers headers)
@@ -145,7 +143,7 @@ websubhub:Service hubService = service object {
         if (authHeader is string) {
             jwt:Payload|http:Unauthorized auth = handler.authenticate(authHeader);
             if (auth is jwt:Payload && validateJwt(auth, ["subscribe"])) {
-                log:print("Received unsubscription request ", request = message.toString());
+                log:printInfo("Received unsubscription request ", request = message.toString());
                 return websubhub:UNSUBSCRIPTION_ACCEPTED;
             } else {
                 log:printError("Authentication credentials invalid");
@@ -159,7 +157,7 @@ websubhub:Service hubService = service object {
 
     remote function onUnsubscriptionValidation(websubhub:Unsubscription message)
                 returns websubhub:UnsubscriptionDeniedError? {
-        log:print("Received unsubscription-validation request ", request = message.toString());
+        log:printInfo("Received unsubscription-validation request ", request = message.toString());
 
         string topicId = crypto:hashSha1(message.hubTopic.toBytes()).toBase64();
         if (!registeredTopics.hasKey(topicId)) {
@@ -173,8 +171,8 @@ websubhub:Service hubService = service object {
         }       
     }
 
-    remote function onUnsubscriptionIntentVerified(websubhub:VerifiedUnsubscription message){
-        log:print("Received unsubscription-intent-verification request ", request = message.toString());
+    remote function onUnsubscriptionIntentVerified(websubhub:VerifiedUnsubscription message) {
+        log:printInfo("Received unsubscription-intent-verification request ", request = message.toString());
 
         string groupId = generateGroupId(message.hubTopic, message.hubCallback);
         var registeredConsumer = registeredConsumers[groupId];
@@ -185,7 +183,7 @@ websubhub:Service hubService = service object {
 
         var persistingResult = persistUnsubscription(message);
         if (persistingResult is error) {
-            log:printError("Error occurred while persisting the unsubscription ", err = persistingResult);
+            log:printError("Error occurred while persisting the unsubscription ", err = persistingResult.message());
         }  
     }
 };

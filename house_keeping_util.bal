@@ -7,28 +7,25 @@ const string REGISTERED_TOPICS = "registered-topics";
 const string REGISTERED_CONSUMERS = "registered-consumers";
 
 kafka:ProducerConfiguration houseKeepingProducerConfig = {
-    bootstrapServers: "localhost:9092",
     clientId: "housekeeping-service",
     acks: "1",
     retryCount: 3
 };
-kafka:Producer houseKeepingService = checkpanic new (houseKeepingProducerConfig);
+kafka:Producer houseKeepingService = check new ("localhost:9092", houseKeepingProducerConfig);
 
 kafka:ConsumerConfiguration topicDetailsConsumerConfig = {
-    bootstrapServers: "localhost:9092",
     groupId: "registered-topics-group",
     offsetReset: "earliest",
     topics: [ "registered-topics" ]
 };
-kafka:Consumer topicDetailsConsumer = checkpanic new (topicDetailsConsumerConfig);
+kafka:Consumer topicDetailsConsumer = check new ("localhost:9092", topicDetailsConsumerConfig);
 
 kafka:ConsumerConfiguration subscriberDetailsConsumerConfig = {
-    bootstrapServers: "localhost:9092",
     groupId: "registered-consumers-group",
     offsetReset: "earliest",
     topics: [ "registered-consumers" ]
 };
-kafka:Consumer subscriberDetailsConsumer = checkpanic new (subscriberDetailsConsumerConfig);
+kafka:Consumer subscriberDetailsConsumer = check new ("localhost:9092", subscriberDetailsConsumerConfig);
 
 function persistTopicRegistrations(websubhub:TopicRegistration message) returns error? {
     websubhub:TopicRegistration[] topics = check getAvailableTopics();
@@ -71,13 +68,13 @@ function persistUnsubscription(websubhub:VerifiedUnsubscription message) returns
 }
 
 function publishHousekeepingData(string topicName, json payload) returns error? {
-    log:print("Publishing content ", topic = topicName, payload = payload);
+    log:printInfo("Publishing content ", topic = topicName, payload = payload);
 
     byte[] serializedContent = payload.toJsonString().toBytes();
 
-    check houseKeepingService->sendProducerRecord({ topic: topicName, value: serializedContent });
+    check houseKeepingService->send({ topic: topicName, value: serializedContent });
 
-    check houseKeepingService->flushRecords();
+    check houseKeepingService->'flush();
 }
 
 function getAvailableTopics() returns websubhub:TopicRegistration[]|error {
@@ -90,7 +87,7 @@ function getAvailableTopics() returns websubhub:TopicRegistration[]|error {
         string|error lastPersistedData = string:fromBytes(lastRecord.value);
         
         if (lastPersistedData is string) {
-            log:print("Last persisted-data set : ", message = lastPersistedData);
+            log:printInfo("Last persisted-data set : ", message = lastPersistedData);
 
             json[] payload =  <json[]> check value:fromJsonString(lastPersistedData);
 
@@ -99,7 +96,7 @@ function getAvailableTopics() returns websubhub:TopicRegistration[]|error {
                 currentTopics.push(topic);
             }
         } else {
-            log:printError("Error occurred while retrieving topic-details ", err = lastPersistedData);
+            log:printError("Error occurred while retrieving topic-details ", err = lastPersistedData.message());
         }
     }
 
@@ -116,7 +113,7 @@ function getAvailableSubscribers() returns websubhub:VerifiedSubscription[]|erro
         string|error lastPersistedData = string:fromBytes(lastRecord.value);
 
         if (lastPersistedData is string) {
-            log:print("Last persisted-data set : ", message = lastPersistedData);
+            log:printInfo("Last persisted-data set : ", message = lastPersistedData);
 
             json[] payload =  <json[]> check value:fromJsonString(lastPersistedData);
             
@@ -125,7 +122,7 @@ function getAvailableSubscribers() returns websubhub:VerifiedSubscription[]|erro
                 currentSubscriptions.push(subscription);
             }
         } else {
-            log:printError("Error occurred while retrieving subscriber-data ", err = lastPersistedData);
+            log:printError("Error occurred while retrieving subscriber-data ", err = lastPersistedData.message());
         }
     }
 

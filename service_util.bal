@@ -12,7 +12,7 @@ function registerTopic(websubhub:TopicRegistration message, boolean persist = tr
     if (persist) {
         var persistingResult = persistTopicRegistrations(message);
         if (persistingResult is error) {
-            log:printError("Error occurred while persisting the topic-registration ", err = persistingResult);
+            log:printError("Error occurred while persisting the topic-registration ", err = persistingResult.message());
         }
     }
 }
@@ -22,16 +22,16 @@ function publishContent(websubhub:UpdateMessage message) returns error? {
     if (registeredTopics.hasKey(topicId)) {
         string topicName = generateTopicName(message.hubTopic);
 
-        log:print("Distributing content to ", Topic = topicName);
+        log:printInfo("Distributing content to ", Topic = topicName);
 
         // here we have assumed that the payload will be in `json` format
         json payload = <json>message.content;
 
         byte[] content = payload.toJsonString().toBytes();
 
-        check mainProducer->sendProducerRecord({ topic: topicName, value: content });
+        check mainProducer->send({ topic: topicName, value: content });
 
-        check mainProducer->flushRecords();
+        check mainProducer->'flush();
     } else {
         return error websubhub:UpdateMessageError("Topic [" + message.hubTopic + "] is not registered with the Hub");
     }
@@ -48,7 +48,7 @@ function subscribe(websubhub:VerifiedSubscription message, boolean persist = tru
     if (persist) {
         var persistingResult = persistSubscription(message);
         if (persistingResult is error) {
-            log:printError("Error occurred while persisting the subscription ", err = persistingResult);
+            log:printError("Error occurred while persisting the subscription ", err = persistingResult.message());
         }    
     }
 }
@@ -62,7 +62,7 @@ function notifySubscriber(websubhub:HubClient clientEp, kafka:Consumer consumerE
             string|error message = string:fromBytes(content);
             
             if (message is string) {
-                log:print("Received message : ", message = message);
+                log:printInfo("Received message : ", message = message);
 
                 json payload =  check value:fromJsonString(message);
                 websubhub:ContentDistributionMessage distributionMsg = {
@@ -73,13 +73,13 @@ function notifySubscriber(websubhub:HubClient clientEp, kafka:Consumer consumerE
                 var publishResponse = clientEp->notifyContentDistribution(distributionMsg);
 
                 if (publishResponse is error) {
-                    log:printError("Error occurred while sending notification to subscriber ", err = publishResponse);
+                    log:printError("Error occurred while sending notification to subscriber ", err = publishResponse.message());
                 } else {
                     _ = check consumerEp->commit();
                 }
 
             } else {
-                log:printError("Error occurred while retrieving message data", err = message);
+                log:printError("Error occurred while retrieving message data", err = message.message());
             }
         }
     }

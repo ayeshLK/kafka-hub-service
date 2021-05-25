@@ -2,7 +2,7 @@ import ballerina/log;
 import ballerina/websubhub;
 
 public function main() returns error? {
-    log:print("Starting hub-service initialization");
+    log:printInfo("Starting hub-service initialization");
     
     websubhub:TopicRegistration[] availableTopics = check getAvailableTopics();
 
