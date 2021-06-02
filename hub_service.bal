@@ -1,16 +1,6 @@
 import ballerina/websubhub;
-import ballerina/crypto;
 import ballerina/log;
-import ballerinax/kafka;
 import ballerina/http;
-
-kafka:ProducerConfiguration mainProducerConfig = {
-    clientId: "main-producer",
-    acks: "1",
-    retryCount: 3
-};
-
-kafka:Producer mainProducer = check new ("localhost:9092", mainProducerConfig);
 
 websubhub:Service hubService = service object {
     remote function onRegisterTopic(websubhub:TopicRegistration message, http:Headers headers)
@@ -55,8 +45,8 @@ websubhub:Service hubService = service object {
                 returns websubhub:SubscriptionDeniedError? {
         log:printInfo("Received subscription-validation request ", request = message.toString());
 
-        string topicId = crypto:hashSha1(message.hubTopic.toBytes()).toBase64();
-        if (!registeredTopics.hasKey(topicId)) {
+        string topicName = generateTopicName(message.hubTopic);
+        if (!registeredTopics.hasKey(topicName)) {
             return error websubhub:SubscriptionDeniedError("Topic [" + message.hubTopic + "] is not registered with the Hub");
         }
     }
@@ -76,12 +66,12 @@ websubhub:Service hubService = service object {
                 returns websubhub:UnsubscriptionDeniedError? {
         log:printInfo("Received unsubscription-validation request ", request = message.toString());
 
-        string topicId = crypto:hashSha1(message.hubTopic.toBytes()).toBase64();
-        if (!registeredTopics.hasKey(topicId)) {
+        string topicName = generateTopicName(message.hubTopic);
+        if (!registeredTopics.hasKey(topicName)) {
             return error websubhub:UnsubscriptionDeniedError("Topic [" + message.hubTopic + "] is not registered with the Hub");
         } else {
-            string groupId = generateGroupId(message.hubTopic, message.hubCallback);
-            if (!registeredConsumers.hasKey(groupId)) {
+            string groupName = generateGroupName(message.hubTopic, message.hubCallback);
+            if (!registeredConsumers.hasKey(groupName)) {
                 return error websubhub:UnsubscriptionDeniedError("Could not find a valid subscriber for Topic [" 
                                 + message.hubTopic + "] and Callback [" + message.hubCallback + "]");
             }
@@ -91,11 +81,11 @@ websubhub:Service hubService = service object {
     remote function onUnsubscriptionIntentVerified(websubhub:VerifiedUnsubscription message) {
         log:printInfo("Received unsubscription-intent-verification request ", request = message.toString());
 
-        string groupId = generateGroupId(message.hubTopic, message.hubCallback);
-        var registeredConsumer = registeredConsumers[groupId];
+        string groupName = generateGroupName(message.hubTopic, message.hubCallback);
+        var registeredConsumer = registeredConsumers[groupName];
         if (registeredConsumer is future<error?>) {
              _ = registeredConsumer.cancel();
-            var result = registeredConsumers.remove(groupId);
+            var result = registeredConsumers.remove(groupName);
         }  
 
         var persistingResult = persistUnsubscription(message);

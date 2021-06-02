@@ -1,6 +1,5 @@
 import ballerinax/kafka;
 import ballerina/websubhub;
-import ballerina/crypto;
 import ballerina/log;
 import ballerina/mime;
 import ballerina/lang.value;
@@ -8,9 +7,18 @@ import ballerina/lang.value;
 map<string> registeredTopics = {};
 map<future<error?>> registeredConsumers = {};
 
+kafka:ProducerConfiguration producerConfig = {
+    clientId: "update-message",
+    acks: "1",
+    retryCount: 3
+};
+
+kafka:Producer updateMessageProducer = check new ("localhost:9092", producerConfig);
+
 function registerTopic(websubhub:TopicRegistration message, boolean persist = true) {
-    string topicId = crypto:hashSha1(message.topic.toBytes()).toBase64();
-    registeredTopics[topicId] = message.topic;
+    log:printInfo("Received topic-registration request ", request = message);
+    string topicName = generateTopicName(message.topic);
+    registeredTopics[topicName] = message.topic;
     
     if (persist) {
         error? persistingResult = persistTopicRegistrations(message);
@@ -21,9 +29,10 @@ function registerTopic(websubhub:TopicRegistration message, boolean persist = tr
 }
 
 function deregisterTopic(websubhub:TopicRegistration message) {
-    string topicId = crypto:hashSha1(message.topic.toBytes()).toBase64();
-    if (registeredTopics.hasKey(topicId)) {
-        string deletedTopic = registeredTopics.remove(topicId);
+    log:printInfo("Received topic-deregistration request ", request = message);
+    string topicName = generateTopicName(message.topic);
+    if (registeredTopics.hasKey(topicName)) {
+        string deletedTopic = registeredTopics.remove(topicName);
     }
 
     error? persistingResult = persistTopicDeregistration(message);
@@ -33,12 +42,13 @@ function deregisterTopic(websubhub:TopicRegistration message) {
 }
 
 function subscribe(websubhub:VerifiedSubscription message, boolean persist = true) returns error? {
+    log:printInfo("Received subscription request ", request = message);
     string topicName = generateTopicName(message.hubTopic);
-    string groupId = generateGroupId(message.hubTopic, message.hubCallback);
-    kafka:Consumer consumerEp = check getConsumer([ topicName ], groupId, false);
+    string groupName = generateGroupName(message.hubTopic, message.hubCallback);
+    kafka:Consumer consumerEp = check getConsumer([ topicName ], groupName, false);
     websubhub:HubClient hubClientEp = check new (message);
     var result = start notifySubscriber(hubClientEp, consumerEp);
-    registeredConsumers[groupId] = result;
+    registeredConsumers[groupName] = result;
 
     if (persist) {
         error? persistingResult = persistSubscription(message);
@@ -49,10 +59,8 @@ function subscribe(websubhub:VerifiedSubscription message, boolean persist = tru
 }
 
 function publishContent(websubhub:UpdateMessage message) returns error? {
-    string topicId = crypto:hashSha1(message.hubTopic.toBytes()).toBase64();
-    if (registeredTopics.hasKey(topicId)) {
-        string topicName = generateTopicName(message.hubTopic);
-
+    string topicName = generateTopicName(message.hubTopic);
+    if (registeredTopics.hasKey(topicName)) {
         log:printInfo("Distributing content to ", Topic = topicName);
 
         // here we have assumed that the payload will be in `json` format
@@ -60,9 +68,9 @@ function publishContent(websubhub:UpdateMessage message) returns error? {
 
         byte[] content = payload.toJsonString().toBytes();
 
-        check mainProducer->send({ topic: topicName, value: content });
+        check updateMessageProducer->send({ topic: topicName, value: content });
 
-        check mainProducer->'flush();
+        check updateMessageProducer->'flush();
     } else {
         return error websubhub:UpdateMessageError("Topic [" + message.hubTopic + "] is not registered with the Hub");
     }
