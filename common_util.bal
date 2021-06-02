@@ -1,6 +1,4 @@
 import ballerinax/kafka;
-import ballerina/jballerina.java;
-import ballerina/jwt;
 
 const string TOPIC_PREFIX = "topic_";
 const string GROUP_PREFIX = "consumer_group_";
@@ -34,35 +32,3 @@ function getConsumer(string[] topics, string consumerGroupId, boolean autoCommit
 
     return check new ("localhost:9092", consumerConfiguration);
 }
-
-isolated function validateJwt(jwt:Payload authDetails, string[] validScopes) returns boolean {
-    var currentTime = getCurrentDate();
-    int currentTimeInMillis = getTimeInMillies(currentTime);
-    int? expiryTime = authDetails?.exp;
-    if (expiryTime is int && expiryTime > (currentTimeInMillis / 1000)) {
-        if (validScopes.length() > 0) {
-            var availableScope = authDetails["scope"];
-            if (availableScope is string) {
-                foreach var scope in validScopes {
-                    if (scope == availableScope) {
-                        return true;
-                    } 
-                }
-            } else {
-                return false;
-            }
-        } else {
-            return true;
-        }
-    }
-    return false;
-}
-
-isolated function getCurrentDate() returns handle = @java:Constructor {
-    'class: "java.util.Date"
-} external;
-
-isolated function getTimeInMillies(handle currentDate) returns int = @java:Method {
-    name: "getTime",
-    'class: "java.util.Date"
-} external;

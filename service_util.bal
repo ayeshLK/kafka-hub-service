@@ -5,15 +5,46 @@ import ballerina/log;
 import ballerina/mime;
 import ballerina/lang.value;
 
+map<string> registeredTopics = {};
+map<future<error?>> registeredConsumers = {};
+
 function registerTopic(websubhub:TopicRegistration message, boolean persist = true) {
     string topicId = crypto:hashSha1(message.topic.toBytes()).toBase64();
     registeredTopics[topicId] = message.topic;
     
     if (persist) {
-        var persistingResult = persistTopicRegistrations(message);
+        error? persistingResult = persistTopicRegistrations(message);
         if (persistingResult is error) {
             log:printError("Error occurred while persisting the topic-registration ", err = persistingResult.message());
         }
+    }
+}
+
+function deregisterTopic(websubhub:TopicRegistration message) {
+    string topicId = crypto:hashSha1(message.topic.toBytes()).toBase64();
+    if (registeredTopics.hasKey(topicId)) {
+        string deletedTopic = registeredTopics.remove(topicId);
+    }
+
+    error? persistingResult = persistTopicDeregistration(message);
+    if (persistingResult is error) {
+        log:printError("Error occurred while persisting the topic-deregistration ", err = persistingResult.message());
+    }
+}
+
+function subscribe(websubhub:VerifiedSubscription message, boolean persist = true) returns error? {
+    string topicName = generateTopicName(message.hubTopic);
+    string groupId = generateGroupId(message.hubTopic, message.hubCallback);
+    kafka:Consumer consumerEp = check getConsumer([ topicName ], groupId, false);
+    websubhub:HubClient hubClientEp = check new (message);
+    var result = start notifySubscriber(hubClientEp, consumerEp);
+    registeredConsumers[groupId] = result;
+
+    if (persist) {
+        error? persistingResult = persistSubscription(message);
+        if (persistingResult is error) {
+            log:printError("Error occurred while persisting the subscription ", err = persistingResult.message());
+        }    
     }
 }
 
@@ -34,22 +65,6 @@ function publishContent(websubhub:UpdateMessage message) returns error? {
         check mainProducer->'flush();
     } else {
         return error websubhub:UpdateMessageError("Topic [" + message.hubTopic + "] is not registered with the Hub");
-    }
-}
-
-function subscribe(websubhub:VerifiedSubscription message, boolean persist = true) returns error? {
-    string topicName = generateTopicName(message.hubTopic);
-    string groupId = generateGroupId(message.hubTopic, message.hubCallback);
-    kafka:Consumer consumerEp = check getConsumer([ topicName ], groupId, false);
-    websubhub:HubClient hubClientEp = check new (message);
-    var result = start notifySubscriber(hubClientEp, consumerEp);
-    registeredConsumers[groupId] = result;
-
-    if (persist) {
-        var persistingResult = persistSubscription(message);
-        if (persistingResult is error) {
-            log:printError("Error occurred while persisting the subscription ", err = persistingResult.message());
-        }    
     }
 }
 
