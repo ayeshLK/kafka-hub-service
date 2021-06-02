@@ -41,14 +41,24 @@ function deregisterTopic(websubhub:TopicRegistration message) {
     }
 }
 
+function updateMessage(websubhub:UpdateMessage msg) returns websubhub:UpdateMessageError? {
+    log:printInfo("Received content-update request ", request = msg.toString());
+    error? errorResponse = publishContent(msg);
+    if (errorResponse is websubhub:UpdateMessageError) {
+        return errorResponse;
+    } else if (errorResponse is error) {
+        log:printError("Error occurred while publishing the content ", errorMessage = errorResponse.message());
+        return error websubhub:UpdateMessageError(errorResponse.message());
+    }
+}
+
 function subscribe(websubhub:VerifiedSubscription message, boolean persist = true) returns error? {
     log:printInfo("Received subscription request ", request = message);
-    string topicName = generateTopicName(message.hubTopic);
     string groupName = generateGroupName(message.hubTopic, message.hubCallback);
-    kafka:Consumer consumerEp = check getConsumer([ topicName ], groupName, false);
+    kafka:Consumer consumerEp = check createConsumer(message.hubTopic, groupName, false);
     websubhub:HubClient hubClientEp = check new (message);
     var result = start notifySubscriber(hubClientEp, consumerEp);
-    registeredConsumers[groupName] = result;
+    // registeredConsumers[groupName] = result;
 
     if (persist) {
         error? persistingResult = persistSubscription(message);
@@ -58,52 +68,53 @@ function subscribe(websubhub:VerifiedSubscription message, boolean persist = tru
     }
 }
 
-function publishContent(websubhub:UpdateMessage message) returns error? {
-    string topicName = generateTopicName(message.hubTopic);
-    if (registeredTopics.hasKey(topicName)) {
-        log:printInfo("Distributing content to ", Topic = topicName);
-
-        // here we have assumed that the payload will be in `json` format
-        json payload = <json>message.content;
-
-        byte[] content = payload.toJsonString().toBytes();
-
-        check updateMessageProducer->send({ topic: topicName, value: content });
-
-        check updateMessageProducer->'flush();
-    } else {
-        return error websubhub:UpdateMessageError("Topic [" + message.hubTopic + "] is not registered with the Hub");
-    }
+function createConsumer(string hubTopic, string groupName, boolean autoCommit = true) returns kafka:Consumer|error {
+    string topicName = generateTopicName(hubTopic);
+    kafka:ConsumerConfiguration consumerConfiguration = {
+        groupId: groupName,
+        offsetReset: "latest",
+        topics: [topicName],
+        autoCommit: autoCommit
+    };
+    return check new ("localhost:9092", consumerConfiguration);
 }
 
 function notifySubscriber(websubhub:HubClient clientEp, kafka:Consumer consumerEp) returns error? {
     while (true) {
-        kafka:ConsumerRecord[] records = check consumerEp->poll(1000);
-
+        kafka:ConsumerRecord[] records = check consumerEp->poll(1);
         foreach var kafkaRecord in records {
             byte[] content = kafkaRecord.value;
             string|error message = string:fromBytes(content);
-            
             if (message is string) {
                 log:printInfo("Received message : ", message = message);
-
                 json payload =  check value:fromJsonString(message);
                 websubhub:ContentDistributionMessage distributionMsg = {
                     content: payload,
                     contentType: mime:APPLICATION_JSON
                 };
-
                 var publishResponse = clientEp->notifyContentDistribution(distributionMsg);
-
                 if (publishResponse is error) {
                     log:printError("Error occurred while sending notification to subscriber ", err = publishResponse.message());
                 } else {
                     _ = check consumerEp->commit();
                 }
-
             } else {
                 log:printError("Error occurred while retrieving message data", err = message.message());
             }
         }
+    }
+}
+
+function publishContent(websubhub:UpdateMessage message) returns error? {
+    string topicName = generateTopicName(message.hubTopic);
+    if (registeredTopics.hasKey(topicName)) {
+        log:printInfo("Distributing content to ", Topic = topicName);
+        // here we have assumed that the payload will be in `json` format
+        json payload = <json>message.content;
+        byte[] content = payload.toJsonString().toBytes();
+        check updateMessageProducer->send({ topic: topicName, value: content });
+        check updateMessageProducer->'flush();
+    } else {
+        return error websubhub:UpdateMessageError("Topic [" + message.hubTopic + "] is not registered with the Hub");
     }
 }

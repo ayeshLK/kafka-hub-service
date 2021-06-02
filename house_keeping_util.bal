@@ -36,14 +36,11 @@ function persistTopicRegistrations(websubhub:TopicRegistration message) returns 
 
 function persistTopicDeregistration(websubhub:TopicDeregistration message) returns error? {
     websubhub:TopicRegistration[] availableTopics = check getAvailableTopics();
-    
     availableTopics = 
         from var registration in availableTopics
         where registration.topic != message.topic
         select registration;
-    
     json[] jsonData = availableTopics;
-
     check publishHousekeepingData(REGISTERED_TOPICS, jsonData);
 }
 
@@ -56,41 +53,30 @@ function persistSubscription(websubhub:VerifiedSubscription message) returns err
 
 function persistUnsubscription(websubhub:VerifiedUnsubscription message) returns error? {
     websubhub:VerifiedUnsubscription[] subscriptions = check getAvailableSubscribers();
-
     subscriptions = 
         from var subscription in subscriptions
         where subscription.hubTopic != message.hubTopic && subscription.hubCallback != message.hubCallback
         select subscription;
-    
     json[] jsonData = <json[]> subscriptions.toJson();
-
     check publishHousekeepingData(REGISTERED_CONSUMERS, jsonData);
 }
 
 function publishHousekeepingData(string topicName, json payload) returns error? {
     log:printInfo("Publishing content ", topic = topicName, payload = payload);
-
     byte[] serializedContent = payload.toJsonString().toBytes();
-
     check houseKeepingService->send({ topic: topicName, value: serializedContent });
-
     check houseKeepingService->'flush();
 }
 
 function getAvailableTopics() returns websubhub:TopicRegistration[]|error {
-    kafka:ConsumerRecord[] records = check topicDetailsConsumer->poll(1000);
-    
+    kafka:ConsumerRecord[] records = check topicDetailsConsumer->poll(1);
     websubhub:TopicRegistration[] currentTopics = [];
-    
     if (records.length() > 0) {
         kafka:ConsumerRecord lastRecord = records.pop();
         string|error lastPersistedData = string:fromBytes(lastRecord.value);
-        
         if (lastPersistedData is string) {
             log:printInfo("Last persisted-data set : ", message = lastPersistedData);
-
             json[] payload =  <json[]> check value:fromJsonString(lastPersistedData);
-
             foreach var data in payload {
                 websubhub:TopicRegistration topic = check data.cloneWithType(websubhub:TopicRegistration);
                 currentTopics.push(topic);
@@ -99,24 +85,18 @@ function getAvailableTopics() returns websubhub:TopicRegistration[]|error {
             log:printError("Error occurred while retrieving topic-details ", err = lastPersistedData.message());
         }
     }
-
     return currentTopics;
 }
 
 function getAvailableSubscribers() returns websubhub:VerifiedSubscription[]|error {
-    kafka:ConsumerRecord[] records = check subscriberDetailsConsumer->poll(1000);
-
+    kafka:ConsumerRecord[] records = check subscriberDetailsConsumer->poll(1);
     websubhub:VerifiedSubscription[] currentSubscriptions = [];
-
     if (records.length() > 0) {
         kafka:ConsumerRecord lastRecord = records.pop();
         string|error lastPersistedData = string:fromBytes(lastRecord.value);
-
         if (lastPersistedData is string) {
             log:printInfo("Last persisted-data set : ", message = lastPersistedData);
-
             json[] payload =  <json[]> check value:fromJsonString(lastPersistedData);
-            
             foreach var data in payload {
                 websubhub:VerifiedSubscription subscription = check data.cloneWithType(websubhub:VerifiedSubscription);
                 currentSubscriptions.push(subscription);
@@ -125,6 +105,5 @@ function getAvailableSubscribers() returns websubhub:VerifiedSubscription[]|erro
             log:printError("Error occurred while retrieving subscriber-data ", err = lastPersistedData.message());
         }
     }
-
     return currentSubscriptions;  
 }

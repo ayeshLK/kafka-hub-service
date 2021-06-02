@@ -1,17 +1,17 @@
 import ballerina/log;
 import ballerina/websubhub;
 
-listener websubhub:Listener hubListener = new websubhub:Listener(9090);
+listener websubhub:Listener hubListener = new (9090);
 
 public function main() returns error? {
-    log:printInfo("Starting hub-service initialization");
+    log:printInfo("Starting Hub-Service initialization");
     
     // Initialize the Hub
     check replayTopicRegistrations();
     check replaySubscriptions();
-
+    
     // Start the Hub
-    check hubListener.attach(<websubhub:Service>hubService, "hub");
+    check hubListener.attach(hubService, "hub");
     check hubListener.'start();
 }
 
