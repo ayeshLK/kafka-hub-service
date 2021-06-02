@@ -55,31 +55,31 @@ websubhub:Service hubService = service object {
                 returns websubhub:UnsubscriptionDeniedError? {
         log:printInfo("Received unsubscription-validation request ", request = message.toString());
 
-        // string topicName = generateTopicName(message.hubTopic);
-        // if (!registeredTopics.hasKey(topicName)) {
-        //     return error websubhub:UnsubscriptionDeniedError("Topic [" + message.hubTopic + "] is not registered with the Hub");
-        // } else {
-        //     string groupName = generateGroupName(message.hubTopic, message.hubCallback);
-        //     if (!registeredConsumers.hasKey(groupName)) {
-        //         return error websubhub:UnsubscriptionDeniedError("Could not find a valid subscriber for Topic [" 
-        //                         + message.hubTopic + "] and Callback [" + message.hubCallback + "]");
-        //     }
-        // }       
+        string topicName = generateTopicName(message.hubTopic);
+        if (!registeredTopics.hasKey(topicName)) {
+            return error websubhub:UnsubscriptionDeniedError("Topic [" + message.hubTopic + "] is not registered with the Hub");
+        } else {
+            string groupName = generateGroupName(message.hubTopic, message.hubCallback);
+            if (!registeredConsumers.hasKey(groupName)) {
+                return error websubhub:UnsubscriptionDeniedError("Could not find a valid subscriber for Topic [" 
+                                + message.hubTopic + "] and Callback [" + message.hubCallback + "]");
+            }
+        }       
     }
 
     remote function onUnsubscriptionIntentVerified(websubhub:VerifiedUnsubscription message) {
         log:printInfo("Received unsubscription-intent-verification request ", request = message.toString());
 
-        // string groupName = generateGroupName(message.hubTopic, message.hubCallback);
-        // var registeredConsumer = registeredConsumers[groupName];
-        // if (registeredConsumer is future<error?>) {
-        //      _ = registeredConsumer.cancel();
-        //     var result = registeredConsumers.remove(groupName);
-        // }  
+        string groupName = generateGroupName(message.hubTopic, message.hubCallback);
+        var registeredConsumer = registeredConsumers[groupName];
+        if (registeredConsumer is future<error?>) {
+             _ = registeredConsumer.cancel();
+            var result = registeredConsumers.remove(groupName);
+        }  
 
-        // var persistingResult = persistUnsubscription(message);
-        // if (persistingResult is error) {
-        //     log:printError("Error occurred while persisting the unsubscription ", err = persistingResult.message());
-        // }  
+        var persistingResult = persistUnsubscription(message);
+        if (persistingResult is error) {
+            log:printError("Error occurred while persisting the unsubscription ", err = persistingResult.message());
+        }  
     }
 };

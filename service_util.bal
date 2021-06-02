@@ -58,7 +58,7 @@ function subscribe(websubhub:VerifiedSubscription message, boolean persist = tru
     kafka:Consumer consumerEp = check createConsumer(message.hubTopic, groupName, false);
     websubhub:HubClient hubClientEp = check new (message);
     var result = start notifySubscriber(hubClientEp, consumerEp);
-    // registeredConsumers[groupName] = result;
+    registeredConsumers[groupName] = result;
 
     if (persist) {
         error? persistingResult = persistSubscription(message);
