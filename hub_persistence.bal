@@ -10,9 +10,9 @@ kafka:ProducerConfiguration producerConfig = {
     retryCount: 3
 };
 
-kafka:Producer updateMessageProducer = check new ("localhost:9092", producerConfig);
+final kafka:Producer updateMessageProducer = check new ("localhost:9092", producerConfig);
 
-function createMessageConsumer(websubhub:VerifiedSubscription message) returns kafka:Consumer|error {
+isolated function createMessageConsumer(websubhub:VerifiedSubscription message) returns kafka:Consumer|error {
     string topicName = generateTopicName(message.hubTopic);
     string groupName = generateGroupName(message.hubTopic, message.hubCallback);
     kafka:ConsumerConfiguration consumerConfiguration = {
@@ -50,7 +50,7 @@ function notifySubscriber(websubhub:HubClient clientEp, kafka:Consumer consumerE
     }
 }
 
-function publishContent(websubhub:UpdateMessage message, string topicName) returns error? {
+isolated function publishContent(websubhub:UpdateMessage message, string topicName) returns error? {
     log:printInfo("Distributing content to ", Topic = topicName);
     // here we have assumed that the payload will be in `json` format
     json payload = <json>message.content;

@@ -11,30 +11,30 @@ kafka:ProducerConfiguration houseKeepingProducerConfig = {
     acks: "1",
     retryCount: 3
 };
-kafka:Producer houseKeepingService = check new ("localhost:9092", houseKeepingProducerConfig);
+final kafka:Producer houseKeepingService = check new ("localhost:9092", houseKeepingProducerConfig);
 
 kafka:ConsumerConfiguration topicDetailsConsumerConfig = {
     groupId: "registered-topics-group",
     offsetReset: "earliest",
     topics: [ "registered-topics" ]
 };
-kafka:Consumer topicDetailsConsumer = check new ("localhost:9092", topicDetailsConsumerConfig);
+final kafka:Consumer topicDetailsConsumer = check new ("localhost:9092", topicDetailsConsumerConfig);
 
 kafka:ConsumerConfiguration subscriberDetailsConsumerConfig = {
     groupId: "registered-consumers-group",
     offsetReset: "earliest",
     topics: [ "registered-consumers" ]
 };
-kafka:Consumer subscriberDetailsConsumer = check new ("localhost:9092", subscriberDetailsConsumerConfig);
+final kafka:Consumer subscriberDetailsConsumer = check new ("localhost:9092", subscriberDetailsConsumerConfig);
 
-function persistTopicRegistrations(websubhub:TopicRegistration message) returns error? {
+isolated function persistTopicRegistrations(websubhub:TopicRegistration message) returns error? {
     websubhub:TopicRegistration[] topics = check getAvailableTopics();
     topics.push(message);
     json[] jsonData = topics;
     check publishHousekeepingData(REGISTERED_TOPICS, jsonData);
 }
 
-function persistTopicDeregistration(websubhub:TopicDeregistration message) returns error? {
+isolated function persistTopicDeregistration(websubhub:TopicDeregistration message) returns error? {
     websubhub:TopicRegistration[] availableTopics = check getAvailableTopics();
     availableTopics = 
         from var registration in availableTopics
@@ -44,14 +44,14 @@ function persistTopicDeregistration(websubhub:TopicDeregistration message) retur
     check publishHousekeepingData(REGISTERED_TOPICS, jsonData);
 }
 
-function persistSubscription(websubhub:VerifiedSubscription message) returns error? {
+isolated function persistSubscription(websubhub:VerifiedSubscription message) returns error? {
     websubhub:VerifiedSubscription[] subscriptions = check getAvailableSubscribers();
     subscriptions.push(message);
     json[] jsonData = <json[]> subscriptions.toJson();
     check publishHousekeepingData(REGISTERED_CONSUMERS, jsonData);
 }
 
-function persistUnsubscription(websubhub:VerifiedUnsubscription message) returns error? {
+isolated function persistUnsubscription(websubhub:VerifiedUnsubscription message) returns error? {
     websubhub:VerifiedUnsubscription[] subscriptions = check getAvailableSubscribers();
     subscriptions = 
         from var subscription in subscriptions
@@ -61,14 +61,14 @@ function persistUnsubscription(websubhub:VerifiedUnsubscription message) returns
     check publishHousekeepingData(REGISTERED_CONSUMERS, jsonData);
 }
 
-function publishHousekeepingData(string topicName, json payload) returns error? {
+isolated function publishHousekeepingData(string topicName, json payload) returns error? {
     log:printInfo("Publish house-keeping data ", topic = topicName, payload = payload);
     byte[] serializedContent = payload.toJsonString().toBytes();
     check houseKeepingService->send({ topic: topicName, value: serializedContent });
     check houseKeepingService->'flush();
 }
 
-function getAvailableTopics() returns websubhub:TopicRegistration[]|error {
+isolated function getAvailableTopics() returns websubhub:TopicRegistration[]|error {
     kafka:ConsumerRecord[] records = check topicDetailsConsumer->poll(1);
     websubhub:TopicRegistration[] currentTopics = [];
     if (records.length() > 0) {
@@ -88,7 +88,7 @@ function getAvailableTopics() returns websubhub:TopicRegistration[]|error {
     return currentTopics;
 }
 
-function getAvailableSubscribers() returns websubhub:VerifiedSubscription[]|error {
+isolated function getAvailableSubscribers() returns websubhub:VerifiedSubscription[]|error {
     kafka:ConsumerRecord[] records = check subscriberDetailsConsumer->poll(1);
     websubhub:VerifiedSubscription[] currentSubscriptions = [];
     if (records.length() > 0) {

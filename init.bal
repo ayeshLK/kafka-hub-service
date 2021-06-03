@@ -20,7 +20,7 @@ function replayTopicRegistrations() returns error? {
     websubhub:TopicRegistration[] availableTopics = check getAvailableTopics();
     foreach var topicDetails in availableTopics {
         string topicName = generateTopicName(topicDetails.topic);
-        registeredTopics[topicName] = topicDetails.topic;
+        addTopic(topicName, topicDetails.topic);
     }
 }
 
@@ -31,6 +31,6 @@ function replaySubscriptions() returns error? {
         kafka:Consumer consumerEp = check createMessageConsumer(subscription);
         websubhub:HubClient hubClientEp = check new (subscription);
         var result = start notifySubscriber(hubClientEp, consumerEp);
-        registeredConsumers[groupName] = result;
+        // registeredConsumers[groupName] = result;
     }
 }
