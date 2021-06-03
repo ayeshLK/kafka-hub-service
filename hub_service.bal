@@ -51,7 +51,7 @@ isolated function removeConsumer(string groupName) {
 websubhub:Service hubService = service object {
     isolated remote function onRegisterTopic(websubhub:TopicRegistration message, http:Headers headers)
                                 returns websubhub:TopicRegistrationSuccess|websubhub:TopicRegistrationError|error {
-        // check authorize(headers, ["register_topic"]);
+        check authorize(headers, ["register_topic"]);
         check self.registerTopic(message);
         return websubhub:TOPIC_REGISTRATION_SUCCESS;
     }
@@ -71,7 +71,7 @@ websubhub:Service hubService = service object {
 
     isolated remote function onDeregisterTopic(websubhub:TopicDeregistration message, http:Headers headers)
                         returns websubhub:TopicDeregistrationSuccess|websubhub:TopicDeregistrationError|error {
-        // check authorize(headers, ["deregister_topic"]);
+        check authorize(headers, ["deregister_topic"]);
         self.deregisterTopic(message);
         return websubhub:TOPIC_DEREGISTRATION_SUCCESS;
     }
@@ -90,7 +90,7 @@ websubhub:Service hubService = service object {
 
     isolated remote function onUpdateMessage(websubhub:UpdateMessage msg, http:Headers headers)
                returns websubhub:Acknowledgement|websubhub:UpdateMessageError|error {  
-        // check authorize(headers, ["update_content"]);
+        check authorize(headers, ["update_content"]);
         check self.updateMessage(msg);
         return websubhub:ACKNOWLEDGEMENT;
     }
@@ -113,7 +113,7 @@ websubhub:Service hubService = service object {
     
     isolated remote function onSubscription(websubhub:Subscription message, http:Headers headers)
                 returns websubhub:SubscriptionAccepted|websubhub:BadSubscriptionError|error {
-        // check authorize(headers, ["subscribe"]);
+        check authorize(headers, ["subscribe"]);
         return websubhub:SUBSCRIPTION_ACCEPTED;
     }
 
@@ -150,7 +150,7 @@ websubhub:Service hubService = service object {
 
     isolated remote function onUnsubscription(websubhub:Unsubscription message, http:Headers headers)
                returns websubhub:UnsubscriptionAccepted|websubhub:BadUnsubscriptionError|websubhub:InternalUnsubscriptionError|error {
-        // check authorize(headers, ["subscribe"]);
+        check authorize(headers, ["subscribe"]);
         return websubhub:UNSUBSCRIPTION_ACCEPTED;
     }
 
