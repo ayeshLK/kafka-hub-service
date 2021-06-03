@@ -62,7 +62,7 @@ function persistUnsubscription(websubhub:VerifiedUnsubscription message) returns
 }
 
 function publishHousekeepingData(string topicName, json payload) returns error? {
-    log:printInfo("Publishing content ", topic = topicName, payload = payload);
+    log:printInfo("Publish house-keeping data ", topic = topicName, payload = payload);
     byte[] serializedContent = payload.toJsonString().toBytes();
     check houseKeepingService->send({ topic: topicName, value: serializedContent });
     check houseKeepingService->'flush();

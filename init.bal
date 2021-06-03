@@ -17,14 +17,19 @@ public function main() returns error? {
 
 function replayTopicRegistrations() returns error? {
     websubhub:TopicRegistration[] availableTopics = check getAvailableTopics();
-    foreach var topic in availableTopics {
-        registerTopic(topic, false);
+    foreach var topicDetails in availableTopics {
+        string topicName = generateTopicName(topicDetails.topic);
+        registeredTopics[topicName] = topicDetails.topic;
     }
 }
 
 function replaySubscriptions() returns error? {
     websubhub:VerifiedSubscription[] availableSubscribers = check getAvailableSubscribers();
     foreach var subscription in availableSubscribers {
-        check subscribe(subscription, false);
+        string groupName = generateGroupName(message.hubTopic, message.hubCallback);
+        kafka:Consumer consumerEp = check createMessageConsumer(message);
+        websubhub:HubClient hubClientEp = check new (message);
+        var result = start notifySubscriber(hubClientEp, consumerEp);
+        registeredConsumers[groupName] = result;
     }
 }
