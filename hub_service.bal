@@ -77,8 +77,11 @@ websubhub:Service hubService = service object {
         log:printInfo("Received subscription-validation request ", request = message.toString());
 
         string topicName = generateTopicName(message.hubTopic);
+        string groupName = generateGroupName(message.hubTopic, message.hubCallback);
         if (!registeredTopics.hasKey(topicName)) {
             return error websubhub:SubscriptionDeniedError("Topic [" + message.hubTopic + "] is not registered with the Hub");
+        } else if (registeredConsumers.hasKey(groupName)) {
+            return error websubhub:SubscriptionDeniedError("Subscriber has already registered with the Hub");
         }
     }
 

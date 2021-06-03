@@ -1,5 +1,6 @@
 import ballerina/log;
 import ballerina/websubhub;
+import ballerinax/kafka;
 
 listener websubhub:Listener hubListener = new (9090);
 
@@ -26,9 +27,9 @@ function replayTopicRegistrations() returns error? {
 function replaySubscriptions() returns error? {
     websubhub:VerifiedSubscription[] availableSubscribers = check getAvailableSubscribers();
     foreach var subscription in availableSubscribers {
-        string groupName = generateGroupName(message.hubTopic, message.hubCallback);
-        kafka:Consumer consumerEp = check createMessageConsumer(message);
-        websubhub:HubClient hubClientEp = check new (message);
+        string groupName = generateGroupName(subscription.hubTopic, subscription.hubCallback);
+        kafka:Consumer consumerEp = check createMessageConsumer(subscription);
+        websubhub:HubClient hubClientEp = check new (subscription);
         var result = start notifySubscriber(hubClientEp, consumerEp);
         registeredConsumers[groupName] = result;
     }
