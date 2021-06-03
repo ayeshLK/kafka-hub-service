@@ -10,13 +10,16 @@ websubhub:Service hubService = service object {
     remote function onRegisterTopic(websubhub:TopicRegistration message, http:Headers headers)
                                 returns websubhub:TopicRegistrationSuccess|websubhub:TopicRegistrationError|error {
         // check authorize(headers, ["register_topic"]);
-        self.registerTopic(message);
+        check self.registerTopic(message);
         return websubhub:TOPIC_REGISTRATION_SUCCESS;
     }
 
-    function registerTopic(websubhub:TopicRegistration message) {
+    function registerTopic(websubhub:TopicRegistration message) returns websubhub:TopicRegistrationError? {
         log:printInfo("Received topic-registration request ", request = message);
         string topicName = generateTopicName(message.topic);
+        if (registeredTopics.hasKey(topicName)) {
+            return error websubhub:TopicRegistrationError("Topic has already registered with the Hub");
+        }
         registeredTopics[topicName] = message.topic;
         error? persistingResult = persistTopicRegistrations(message);
         if (persistingResult is error) {
@@ -95,8 +98,8 @@ websubhub:Service hubService = service object {
         string groupName = generateGroupName(message.hubTopic, message.hubCallback);
         kafka:Consumer consumerEp = check createMessageConsumer(message);
         websubhub:HubClient hubClientEp = check new (message);
-        var result = start notifySubscriber(hubClientEp, consumerEp);
-        registeredConsumers[groupName] = result;
+        _ = start notifySubscriber(hubClientEp, consumerEp);
+        // registeredConsumers[groupName] = result;
         error? persistingResult = persistSubscription(message);
         if (persistingResult is error) {
             log:printError("Error occurred while persisting the subscription ", err = persistingResult.message());
