@@ -19,7 +19,10 @@ public function main() returns error? {
         }
     );
 
+    websubhub:TopicRegistrationSuccess|websubhub:TopicRegistrationError registrationResponse = websubHubClientEP->registerTopic("test");
+    io:println("Receieved topic registration result : ", registrationResponse);
+
     json params = { event: "event"};
     websubhub:Acknowledgement|websubhub:UpdateMessageError response = websubHubClientEP->publishUpdate("test", params);
-    io:println("Receieved topic registration result : ", response);
+    io:println("Receieved content-publish result : ", response);
 }
