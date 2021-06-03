@@ -50,6 +50,12 @@ isolated function removeSubscriber(string groupName) {
 configurable boolean securityOn = ?;
 
 websubhub:Service hubService = service object {
+    # Registers a `topic` in the hub.
+    # 
+    # + message - Details related to the topic-registration
+    # + headers - `http:Headers` of the original `http:Request`
+    # + return - `websubhub:TopicRegistrationSuccess` if topic registration is successful, `websubhub:TopicRegistrationError`
+    #            if topic registration failed or `error` if there is any unexpected error
     isolated remote function onRegisterTopic(websubhub:TopicRegistration message, http:Headers headers)
                                 returns websubhub:TopicRegistrationSuccess|websubhub:TopicRegistrationError|error {
         if (securityOn) {
@@ -72,6 +78,12 @@ websubhub:Service hubService = service object {
         }
     }
 
+    # Deregisters a `topic` in the hub.
+    # 
+    # + message - Details related to the topic-deregistration
+    # + headers - `http:Headers` of the original `http:Request`
+    # + return - `websubhub:TopicDeregistrationSuccess` if topic deregistration is successful, `websubhub:TopicDeregistrationError`
+    #            if topic deregistration failed or `error` if there is any unexpected error
     isolated remote function onDeregisterTopic(websubhub:TopicDeregistration message, http:Headers headers)
                         returns websubhub:TopicDeregistrationSuccess|websubhub:TopicDeregistrationError|error {
         if (securityOn) {
@@ -93,12 +105,18 @@ websubhub:Service hubService = service object {
         }
     }
 
-    isolated remote function onUpdateMessage(websubhub:UpdateMessage msg, http:Headers headers)
+    # Publishes content to the hub.
+    # 
+    # + message - Details of the published content
+    # + headers - `http:Headers` of the original `http:Request`
+    # + return - `websubhub:Acknowledgement` if publish content is successful, `websubhub:UpdateMessageError`
+    #            if publish content failed or `error` if there is any unexpected error
+    isolated remote function onUpdateMessage(websubhub:UpdateMessage message, http:Headers headers)
                returns websubhub:Acknowledgement|websubhub:UpdateMessageError|error {  
         if (securityOn) {
             check authorize(headers, ["update_content"]);
         }
-        check self.updateMessage(msg);
+        check self.updateMessage(message);
         return websubhub:ACKNOWLEDGEMENT;
     }
 
@@ -118,6 +136,12 @@ websubhub:Service hubService = service object {
         }
     }
     
+    # Subscribes a consumer to the hub.
+    # 
+    # + message - Details of the subscription
+    # + headers - `http:Headers` of the original `http:Request`
+    # + return - `websubhub:SubscriptionAccepted` if subscription is accepted from the hub, `websubhub:BadSubscriptionError`
+    #            if subscription is denied from the hub or `error` if there is any unexpected error
     isolated remote function onSubscription(websubhub:Subscription message, http:Headers headers)
                 returns websubhub:SubscriptionAccepted|websubhub:BadSubscriptionError|error {
         if (securityOn) {
@@ -126,6 +150,10 @@ websubhub:Service hubService = service object {
         return websubhub:SUBSCRIPTION_ACCEPTED;
     }
 
+    # Validates a incomming subscription request.
+    # 
+    # + message - Details of the subscription
+    # + return - `websubhub:SubscriptionDeniedError` if the subscription is denied by the hub or else `()`
     isolated remote function onSubscriptionValidation(websubhub:Subscription message)
                 returns websubhub:SubscriptionDeniedError? {
         log:printInfo("Received subscription-validation request ", request = message.toString());
@@ -139,6 +167,10 @@ websubhub:Service hubService = service object {
         }
     }
 
+    # Processes a verified subscription request.
+    # 
+    # + message - Details of the subscription
+    # + return - `error` if there is any unexpected error or else `()`
     isolated remote function onSubscriptionIntentVerified(websubhub:VerifiedSubscription message) returns error? {
         log:printInfo("Received subscription-intent-verification request ", request = message.toString());
         check self.subscribe(message);
@@ -158,14 +190,24 @@ websubhub:Service hubService = service object {
         error? notificationError = notifySubscriber(hubClientEp, consumerEp, switch); 
     }
 
+    # Unsubscribes a consumer from the hub.
+    # 
+    # + message - Details of the unsubscription
+    # + headers - `http:Headers` of the original `http:Request`
+    # + return - `websubhub:UnsubscriptionAccepted` if unsubscription is accepted from the hub, `websubhub:BadUnsubscriptionError`
+    #            if unsubscription is denied from the hub or `error` if there is any unexpected error
     isolated remote function onUnsubscription(websubhub:Unsubscription message, http:Headers headers)
-               returns websubhub:UnsubscriptionAccepted|websubhub:BadUnsubscriptionError|websubhub:InternalUnsubscriptionError|error {
+               returns websubhub:UnsubscriptionAccepted|websubhub:BadUnsubscriptionError|error {
         if (securityOn) {
             check authorize(headers, ["subscribe"]);
         }
         return websubhub:UNSUBSCRIPTION_ACCEPTED;
     }
 
+    # Validates a incomming unsubscription request.
+    # 
+    # + message - Details of the unsubscription
+    # + return - `websubhub:UnsubscriptionDeniedError` if the unsubscription is denied by the hub or else `()`
     isolated remote function onUnsubscriptionValidation(websubhub:Unsubscription message)
                 returns websubhub:UnsubscriptionDeniedError? {
         log:printInfo("Received unsubscription-validation request ", request = message.toString());
@@ -182,6 +224,9 @@ websubhub:Service hubService = service object {
         }       
     }
 
+    # Processes a verified unsubscription request.
+    # 
+    # + message - Details of the unsubscription
     isolated remote function onUnsubscriptionIntentVerified(websubhub:VerifiedUnsubscription message) {
         log:printInfo("Received unsubscription-intent-verification request ", request = message.toString());
         string groupName = generateGroupName(message.hubTopic, message.hubCallback);
