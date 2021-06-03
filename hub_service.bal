@@ -24,34 +24,37 @@ isolated function removeTopic(string topicName) returns string {
 }
 
 
-isolated map<future<error?>> registeredConsumers = {};
+isolated map<Switch> subscribers = {};
 
-isolated function isConsumerAvailable(string groupName) returns boolean {
+isolated function isSubscriberAvailable(string groupName) returns boolean {
     lock {
-        return registeredConsumers.hasKey(groupName);
+        return subscribers.hasKey(groupName);
     }
 }
 
-// isolated function addConsumer(string groupName, future<error?> result) {
-//     lock {
-//         registeredConsumers[groupName] = result;
-//     }
-// }
-
-isolated function removeConsumer(string groupName) {
+isolated function addSubscriber(string groupName, Switch switch) {
     lock {
-        var registeredConsumer = registeredConsumers[groupName];
-        if (registeredConsumer is future<error?>) {
-             _ = registeredConsumer.cancel();
-            var result = registeredConsumers.remove(groupName);
+        subscribers[groupName] = switch;
+    }
+}
+
+isolated function removeSubscriber(string groupName) {
+    lock {
+        var subscriber = subscribers[groupName];
+        if (subscriber is Switch) {
+            subscriber.close();
         }
     }
 }
 
+configurable boolean securityOn = ?;
+
 websubhub:Service hubService = service object {
     isolated remote function onRegisterTopic(websubhub:TopicRegistration message, http:Headers headers)
                                 returns websubhub:TopicRegistrationSuccess|websubhub:TopicRegistrationError|error {
-        check authorize(headers, ["register_topic"]);
+        if (securityOn) {
+            check authorize(headers, ["register_topic"]);
+        }
         check self.registerTopic(message);
         return websubhub:TOPIC_REGISTRATION_SUCCESS;
     }
@@ -71,7 +74,9 @@ websubhub:Service hubService = service object {
 
     isolated remote function onDeregisterTopic(websubhub:TopicDeregistration message, http:Headers headers)
                         returns websubhub:TopicDeregistrationSuccess|websubhub:TopicDeregistrationError|error {
-        check authorize(headers, ["deregister_topic"]);
+        if (securityOn) {
+            check authorize(headers, ["deregister_topic"]);
+        }
         self.deregisterTopic(message);
         return websubhub:TOPIC_DEREGISTRATION_SUCCESS;
     }
@@ -90,7 +95,9 @@ websubhub:Service hubService = service object {
 
     isolated remote function onUpdateMessage(websubhub:UpdateMessage msg, http:Headers headers)
                returns websubhub:Acknowledgement|websubhub:UpdateMessageError|error {  
-        check authorize(headers, ["update_content"]);
+        if (securityOn) {
+            check authorize(headers, ["update_content"]);
+        }
         check self.updateMessage(msg);
         return websubhub:ACKNOWLEDGEMENT;
     }
@@ -113,7 +120,9 @@ websubhub:Service hubService = service object {
     
     isolated remote function onSubscription(websubhub:Subscription message, http:Headers headers)
                 returns websubhub:SubscriptionAccepted|websubhub:BadSubscriptionError|error {
-        check authorize(headers, ["subscribe"]);
+        if (securityOn) {
+            check authorize(headers, ["subscribe"]);
+        }
         return websubhub:SUBSCRIPTION_ACCEPTED;
     }
 
@@ -125,7 +134,7 @@ websubhub:Service hubService = service object {
         string groupName = generateGroupName(message.hubTopic, message.hubCallback);
         if (!isTopicAvailable(topicName)) {
             return error websubhub:SubscriptionDeniedError("Topic [" + message.hubTopic + "] is not registered with the Hub");
-        } else if (isConsumerAvailable(groupName)) {
+        } else if (isSubscriberAvailable(groupName)) {
             return error websubhub:SubscriptionDeniedError("Subscriber has already registered with the Hub");
         }
     }
@@ -140,17 +149,20 @@ websubhub:Service hubService = service object {
         string groupName = generateGroupName(message.hubTopic, message.hubCallback);
         kafka:Consumer consumerEp = check createMessageConsumer(message);
         websubhub:HubClient hubClientEp = check new (message);
-        error? notificationError = notifySubscriber(hubClientEp, consumerEp);
-        // registeredConsumers[groupName] = result;
         error? persistingResult = persistSubscription(message);
         if (persistingResult is error) {
             log:printError("Error occurred while persisting the subscription ", err = persistingResult.message());
-        } 
+        }
+        Switch switch = new ();
+        addSubscriber(groupName, switch);
+        error? notificationError = notifySubscriber(hubClientEp, consumerEp, switch); 
     }
 
     isolated remote function onUnsubscription(websubhub:Unsubscription message, http:Headers headers)
                returns websubhub:UnsubscriptionAccepted|websubhub:BadUnsubscriptionError|websubhub:InternalUnsubscriptionError|error {
-        check authorize(headers, ["subscribe"]);
+        if (securityOn) {
+            check authorize(headers, ["subscribe"]);
+        }
         return websubhub:UNSUBSCRIPTION_ACCEPTED;
     }
 
@@ -163,7 +175,7 @@ websubhub:Service hubService = service object {
             return error websubhub:UnsubscriptionDeniedError("Topic [" + message.hubTopic + "] is not registered with the Hub");
         } else {
             string groupName = generateGroupName(message.hubTopic, message.hubCallback);
-            if (!isConsumerAvailable(groupName)) {
+            if (!isSubscriberAvailable(groupName)) {
                 return error websubhub:UnsubscriptionDeniedError("Could not find a valid subscriber for Topic [" 
                                 + message.hubTopic + "] and Callback [" + message.hubCallback + "]");
             }
@@ -173,7 +185,7 @@ websubhub:Service hubService = service object {
     isolated remote function onUnsubscriptionIntentVerified(websubhub:VerifiedUnsubscription message) {
         log:printInfo("Received unsubscription-intent-verification request ", request = message.toString());
         string groupName = generateGroupName(message.hubTopic, message.hubCallback);
-        removeConsumer(groupName);  
+        removeSubscriber(groupName);  
         var persistingResult = persistUnsubscription(message);
         if (persistingResult is error) {
             log:printError("Error occurred while persisting the unsubscription ", err = persistingResult.message());

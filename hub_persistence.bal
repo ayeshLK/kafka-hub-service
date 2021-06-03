@@ -24,8 +24,8 @@ isolated function createMessageConsumer(websubhub:VerifiedSubscription message) 
     return check new ("localhost:9092", consumerConfiguration);  
 }
 
-isolated function notifySubscriber(websubhub:HubClient clientEp, kafka:Consumer consumerEp) returns error? {
-    while (true) {
+isolated function notifySubscriber(websubhub:HubClient clientEp, kafka:Consumer consumerEp, Switch switch) returns error? {
+    while (switch.isOpen()) {
         kafka:ConsumerRecord[] records = check consumerEp->poll(1);
         foreach var kafkaRecord in records {
             byte[] content = kafkaRecord.value;

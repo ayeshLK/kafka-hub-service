@@ -30,6 +30,7 @@ final kafka:Consumer subscriberDetailsConsumer = check new ("localhost:9092", su
 isolated function persistTopicRegistrations(websubhub:TopicRegistration message) returns error? {
     websubhub:TopicRegistration[] topics = check getAvailableTopics();
     topics.push(message);
+    log:printInfo("Updated topics ", current = topics);
     json[] jsonData = topics;
     check publishHousekeepingData(REGISTERED_TOPICS, jsonData);
 }
@@ -40,6 +41,7 @@ isolated function persistTopicDeregistration(websubhub:TopicDeregistration messa
         from var registration in availableTopics
         where registration.topic != message.topic
         select registration;
+    log:printInfo("Updated topics ", current = availableTopics);
     json[] jsonData = availableTopics;
     check publishHousekeepingData(REGISTERED_TOPICS, jsonData);
 }
@@ -47,6 +49,7 @@ isolated function persistTopicDeregistration(websubhub:TopicDeregistration messa
 isolated function persistSubscription(websubhub:VerifiedSubscription message) returns error? {
     websubhub:VerifiedSubscription[] subscriptions = check getAvailableSubscribers();
     subscriptions.push(message);
+    log:printInfo("Updated subscriptions ", current = subscriptions);
     json[] jsonData = <json[]> subscriptions.toJson();
     check publishHousekeepingData(REGISTERED_CONSUMERS, jsonData);
 }
@@ -57,6 +60,7 @@ isolated function persistUnsubscription(websubhub:VerifiedUnsubscription message
         from var subscription in subscriptions
         where subscription.hubTopic != message.hubTopic && subscription.hubCallback != message.hubCallback
         select subscription;
+    log:printInfo("Updated subscriptions ", current = subscriptions);
     json[] jsonData = <json[]> subscriptions.toJson();
     check publishHousekeepingData(REGISTERED_CONSUMERS, jsonData);
 }
