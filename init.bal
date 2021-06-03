@@ -1,30 +1,36 @@
 import ballerina/log;
 import ballerina/websubhub;
+import ballerinax/kafka;
+
+listener websubhub:Listener hubListener = new (9090);
 
 public function main() returns error? {
-    log:print("Starting hub-service initialization");
+    log:printInfo("Starting Hub-Service initialization");
     
-    websubhub:TopicRegistration[] availableTopics = check getAvailableTopics();
-
-    websubhub:VerifiedSubscription[] availableSubscribers = check getAvailableSubscribers();
-
-    check replayTopicRegistrations(availableTopics);
-
-    check replaySubscriptions(availableSubscribers);
-
-    check hubListener.attach(<websubhub:Service>hubService, "hub");
-
+    // Initialize the Hub
+    check replayTopicRegistrations();
+    check replaySubscriptions();
+    
+    // Start the Hub
+    check hubListener.attach(hubService, "hub");
     check hubListener.'start();
 }
 
-function replayTopicRegistrations(websubhub:TopicRegistration[] topics) returns error? {
-    foreach var topic in topics {
-        registerTopic(topic, false);
+function replayTopicRegistrations() returns error? {
+    websubhub:TopicRegistration[] availableTopics = check getAvailableTopics();
+    foreach var topicDetails in availableTopics {
+        string topicName = generateTopicName(topicDetails.topic);
+        addTopic(topicName, topicDetails.topic);
     }
 }
 
-function replaySubscriptions(websubhub:VerifiedSubscription[] subscriptions) returns error? {
-    foreach var subscription in subscriptions {
-        check subscribe(subscription, false);
+function replaySubscriptions() returns error? {
+    websubhub:VerifiedSubscription[] availableSubscribers = check getAvailableSubscribers();
+    foreach var subscription in availableSubscribers {
+        string groupName = generateGroupName(subscription.hubTopic, subscription.hubCallback);
+        kafka:Consumer consumerEp = check createMessageConsumer(subscription);
+        websubhub:HubClient hubClientEp = check new (subscription);
+        var result = start notifySubscriber(hubClientEp, consumerEp);
+        // registeredConsumers[groupName] = result;
     }
 }

@@ -1,35 +1,14 @@
-import ballerinax/kafka;
-
-const string TOPIC_PREFIX = "topic_";
-const string GROUP_PREFIX = "consumer_group_";
+import ballerina/regex;
 
 isolated function generateTopicName(string topic) returns string {
-    return TOPIC_PREFIX + getStringHash(topic).toString();
+    return nomalizeString(topic);
 }
 
-isolated function generateGroupId(string topic, string callbackUrl) returns string {
-    string idValue = topic + ":" + callbackUrl;
-    return GROUP_PREFIX + getStringHash(idValue).toString();
+isolated function generateGroupName(string topic, string callbackUrl) returns string {
+    string idValue = topic + ":::" + callbackUrl;
+    return nomalizeString(idValue);
 }
 
-isolated function getStringHash(string value) returns int {
-    int hashCount = 0;
-    int index = 0;
-    while (index < value.length()) {
-        hashCount += value.getCodePoint(index);
-        index += 1;
-    }
-    return hashCount;
-}
-
-function getConsumer(string[] topics, string consumerGroupId, boolean autoCommit = true) returns kafka:Consumer|error {
-    kafka:ConsumerConfiguration consumerConfiguration = {
-        bootstrapServers: "localhost:9092",
-        groupId: consumerGroupId,
-        offsetReset: "latest",
-        topics: topics,
-        autoCommit: autoCommit
-    };
-
-    return check new (consumerConfiguration);
+isolated function nomalizeString(string baseString) returns string {
+    return regex:replaceAll(baseString, "[^a-zA-Z0-9]", "_");
 }
