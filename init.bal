@@ -30,7 +30,7 @@ function replaySubscriptions() returns error? {
         string groupName = generateGroupName(subscription.hubTopic, subscription.hubCallback);
         kafka:Consumer consumerEp = check createMessageConsumer(subscription);
         websubhub:HubClient hubClientEp = check new (subscription);
-        var result = start notifySubscriber(hubClientEp, consumerEp);
+        error? result = notifySubscriber(hubClientEp, consumerEp);
         // registeredConsumers[groupName] = result;
     }
 }
