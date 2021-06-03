@@ -5,7 +5,7 @@ import ballerinax/kafka;
 listener websubhub:Listener hubListener = new (9090);
 
 public function main() returns error? {
-    log:printInfo("Starting Hub-Service initialization");
+    log:printInfo("Starting Hub-Service");
     
     // Initialize the Hub
     check replayTopicRegistrations();
@@ -30,7 +30,8 @@ function replaySubscriptions() returns error? {
         string groupName = generateGroupName(subscription.hubTopic, subscription.hubCallback);
         kafka:Consumer consumerEp = check createMessageConsumer(subscription);
         websubhub:HubClient hubClientEp = check new (subscription);
-        error? result = notifySubscriber(hubClientEp, consumerEp);
-        // registeredConsumers[groupName] = result;
+        Switch switch = new ();
+        addSubscriber(groupName, switch);
+        var result = start notifySubscriber(hubClientEp, consumerEp, switch);
     }
 }
