@@ -130,17 +130,17 @@ websubhub:Service hubService = service object {
         }
     }
 
-    remote function onSubscriptionIntentVerified(websubhub:VerifiedSubscription message) returns error? {
+    isolated remote function onSubscriptionIntentVerified(websubhub:VerifiedSubscription message) returns error? {
         log:printInfo("Received subscription-intent-verification request ", request = message.toString());
         check self.subscribe(message);
     }
 
-    function subscribe(websubhub:VerifiedSubscription message) returns error? {
+    isolated function subscribe(websubhub:VerifiedSubscription message) returns error? {
         log:printInfo("Received subscription request ", request = message);
         string groupName = generateGroupName(message.hubTopic, message.hubCallback);
         kafka:Consumer consumerEp = check createMessageConsumer(message);
         websubhub:HubClient hubClientEp = check new (message);
-        _ = start notifySubscriber(hubClientEp, consumerEp);
+        error? notificationError = notifySubscriber(hubClientEp, consumerEp);
         // registeredConsumers[groupName] = result;
         error? persistingResult = persistSubscription(message);
         if (persistingResult is error) {
