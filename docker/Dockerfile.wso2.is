@@ -1,0 +1,15 @@
+FROM adoptopenjdk/openjdk11:alpine-slim
+
+MAINTAINER ayesh almeida
+
+COPY ./target/docker-sample-app /opt/app
+
+RUN chmod 500 /opt/app/bin/*
+
+WORKDIR /opt/app/bin/
+
+RUN ls -l ./
+
+CMD ["sh", "docker-sample-app", "console"]
+
+EXPOSE 10001
