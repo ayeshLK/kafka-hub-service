@@ -30,8 +30,8 @@ function replaySubscriptions() returns error? {
         string groupName = generateGroupName(subscription.hubTopic, subscription.hubCallback);
         kafka:Consumer consumerEp = check createMessageConsumer(subscription);
         websubhub:HubClient hubClientEp = check new (subscription);
-        Switch switch = new ();
-        addSubscriber(groupName, switch);
-        var result = start notifySubscriber(hubClientEp, consumerEp, switch);
+        boolean shouldRunNotification = true;
+        addSubscriber(groupName, shouldRunNotification);
+        var result = start notifySubscriber(hubClientEp, consumerEp, shouldRunNotification);
     }
 }

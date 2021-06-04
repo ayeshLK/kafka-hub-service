@@ -24,7 +24,7 @@ isolated function removeTopic(string topicName) returns string {
 }
 
 
-isolated map<Switch> subscribers = {};
+isolated map<boolean> subscribers = {};
 
 isolated function isSubscriberAvailable(string groupName) returns boolean {
     lock {
@@ -32,17 +32,17 @@ isolated function isSubscriberAvailable(string groupName) returns boolean {
     }
 }
 
-isolated function addSubscriber(string groupName, Switch switch) {
+isolated function addSubscriber(string groupName, boolean isOn) {
     lock {
-        subscribers[groupName] = switch;
+        subscribers[groupName] = isOn;
     }
 }
 
 isolated function removeSubscriber(string groupName) {
     lock {
-        var subscriber = subscribers[groupName];
-        if (subscriber is Switch) {
-            subscriber.close();
+        var isOn = subscribers[groupName];
+        if (isOn is boolean) {
+            isOn = false;
         }
     }
 }
@@ -185,9 +185,9 @@ websubhub:Service hubService = service object {
         if (persistingResult is error) {
             log:printError("Error occurred while persisting the subscription ", err = persistingResult.message());
         }
-        Switch switch = new ();
-        addSubscriber(groupName, switch);
-        error? notificationError = notifySubscriber(hubClientEp, consumerEp, switch); 
+        boolean shouldRunNotification = true;
+        addSubscriber(groupName, shouldRunNotification);
+        error? notificationError = notifySubscriber(hubClientEp, consumerEp, shouldRunNotification);
     }
 
     # Unsubscribes a consumer from the hub.
