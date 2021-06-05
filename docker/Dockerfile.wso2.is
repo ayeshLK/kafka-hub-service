@@ -2,14 +2,14 @@ FROM adoptopenjdk/openjdk11:alpine-slim
 
 MAINTAINER ayesh almeida
 
-COPY ./target/docker-sample-app /opt/app
+COPY ./wso2is-5.11.0.zip /opt/
 
-RUN chmod 500 /opt/app/bin/*
+RUN unzip /opt/wso2is-5.11.0.zip -d /opt/
 
-WORKDIR /opt/app/bin/
+RUN chmod 500 /opt/wso2is-5.11.0/bin/*
 
-RUN ls -l ./
+WORKDIR /opt/wso2is-5.11.0/bin/
 
-CMD ["sh", "docker-sample-app", "console"]
+CMD ["sh", "wso2server.sh"]
 
-EXPOSE 10001
+EXPOSE 9443
