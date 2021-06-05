@@ -2,7 +2,7 @@
 
 Here we will be considering to publish the docker image for `WSO2 Identity Server`. 
 
-## Building & Publishing ##
+## Build, Publish & Run ##
 
 * Dokcer uses tags to control the version of the images.
 * Usually when publishing tags there will be two versions. Current version and the `latest` tags.
@@ -18,4 +18,8 @@ docker build --file=./Dockerfile.wso2.is -t ayeshalmeida/wso2-is:latest --rm=tru
 docker push ayeshalmeida/wso2-is:latest
 ```
 
+* Use following command to run `WSO2 IS` image.
+```
+docker container run -d --name wso2-is-instance -p 9443:9443  ayeshalmeida/wso2-is:latest
+``
 
