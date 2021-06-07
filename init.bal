@@ -3,6 +3,8 @@ import ballerina/websubhub;
 import ballerina/io;
 import ballerinax/kafka;
 import ballerina/lang.value;
+import ballerina/random;
+import ballerina/lang.'string as strings;
 
 listener websubhub:Listener hubListener = new (9090);
 
@@ -21,17 +23,18 @@ public function main() returns error? {
 configurable string serverId = ?;
 const string REGISTERED_TOPICS = "registered-topics";
 const string REGISTERED_CONSUMERS = "registered-consumers";
+string constructedServerId = string`${serverId}-${generateRandomString()}`;
 
 kafka:ConsumerConfiguration topicDetailsConsumerConfig = {
-    groupId: "registered-topics-group-" + serverId,
-    offsetReset: "latest",
+    groupId: "registered-topics-group-" + constructedServerId,
+    offsetReset: "earliest",
     topics: [ REGISTERED_TOPICS ]
 };
 final kafka:Consumer topicDetailsConsumer = check new ("localhost:9092", topicDetailsConsumerConfig);
 
 kafka:ConsumerConfiguration subscriberDetailsConsumerConfig = {
-    groupId: "registered-consumers-group-" + serverId,
-    offsetReset: "latest",
+    groupId: "registered-consumers-group-" + constructedServerId,
+    offsetReset: "earliest",
     topics: [ REGISTERED_CONSUMERS ]
 };
 final kafka:Consumer subscriberDetailsConsumer = check new ("localhost:9092", subscriberDetailsConsumerConfig);
@@ -91,7 +94,7 @@ function updateSubscriptionDetails() returns error? {
                 }
                 kafka:Consumer consumerEp = check createMessageConsumer(subscriber);
                 websubhub:HubClient hubClientEp = check new (subscriber);
-                _ = start notifySubscriber(hubClientEp, consumerEp, groupName);
+                _ = @strand { thread: "any" } start notifySubscriber(hubClientEp, consumerEp, groupName);
             }
         }
     }
