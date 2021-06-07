@@ -8,8 +8,8 @@ import ballerina/log;
     httpConfig: {
         auth : {
             tokenUrl: "https://localhost:9443/oauth2/token",
-            clientId: "8EsaVTsN64t4sMDhGvBqJoqMi8Ea",
-            clientSecret: "QC71AIfbBjhgAibpi0mpfIEK_bMa",
+            clientId: "M59Zf4x1H886m2wtD0M1fX69uoga",
+            clientSecret: "UN5axp6vsT5FoEXfCUXUH3RtbjIa",
             scopes: ["subscribe"],
             clientConfig: {
                 secureSocket: {
