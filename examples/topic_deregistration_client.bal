@@ -7,7 +7,7 @@ public function main() returns error? {
             tokenUrl: "https://localhost:9443/oauth2/token",
             clientId: "M59Zf4x1H886m2wtD0M1fX69uoga",
             clientSecret: "UN5axp6vsT5FoEXfCUXUH3RtbjIa",
-            scopes: ["update_content"],
+            scopes: ["deregister_topic"],
             clientConfig: {
                 secureSocket: {
                     cert: {
@@ -18,7 +18,6 @@ public function main() returns error? {
             }
         }
     );
-    json params = { event: "event"};
-    var response = websubHubClientEP->publishUpdate("test", params);
-    io:println("Receieved content-publish result : ", response);
+    var registrationResponse = websubHubClientEP->deregisterTopic("test");
+    io:println("Receieved topic registration result : ", registrationResponse);
 }

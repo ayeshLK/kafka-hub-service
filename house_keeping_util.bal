@@ -2,6 +2,7 @@ import ballerina/websubhub;
 import ballerina/log;
 import ballerina/lang.value;
 import ballerinax/kafka;
+import ballerina/io;
 
 const string REGISTERED_TOPICS = "registered-topics";
 const string REGISTERED_CONSUMERS = "registered-consumers";
@@ -28,22 +29,32 @@ kafka:ConsumerConfiguration subscriberDetailsConsumerConfig = {
 final kafka:Consumer subscriberDetailsConsumer = check new ("localhost:9092", subscriberDetailsConsumerConfig);
 
 isolated function persistTopicRegistrations(websubhub:TopicRegistration message) returns error? {
-    websubhub:TopicRegistration[] topics = check getAvailableTopics();
-    topics.push(message);
-    log:printInfo("Updated topics ", current = topics);
-    json[] jsonData = topics;
-    check publishHousekeepingData(REGISTERED_TOPICS, jsonData);
+    lock {
+        websubhub:TopicRegistration[] availableTopics = [];
+        foreach var topic in registeredTopics {
+            availableTopics.push(topic);
+        }
+        availableTopics.push(message.cloneReadOnly());
+        log:printInfo("Updated persistent data ", current = availableTopics);
+        json[] jsonData = availableTopics;
+        check publishHousekeepingData(REGISTERED_TOPICS, jsonData);
+    }
 }
 
 isolated function persistTopicDeregistration(websubhub:TopicDeregistration message) returns error? {
-    websubhub:TopicRegistration[] availableTopics = check getAvailableTopics();
-    availableTopics = 
-        from var registration in availableTopics
-        where registration.topic != message.topic
-        select registration;
-    log:printInfo("Updated topics ", current = availableTopics);
-    json[] jsonData = availableTopics;
-    check publishHousekeepingData(REGISTERED_TOPICS, jsonData);
+    lock {
+        websubhub:TopicRegistration[] availableTopics = [];
+        foreach var topic in registeredTopics {
+            availableTopics.push(topic);
+        }
+        availableTopics = 
+            from var registration in availableTopics
+            where registration.topic != message.topic
+            select registration.cloneReadOnly();
+        log:printInfo("Updated persistent data ", current = availableTopics);
+        json[] jsonData = availableTopics;
+        check publishHousekeepingData(REGISTERED_TOPICS, jsonData);
+    }
 }
 
 isolated function persistSubscription(websubhub:VerifiedSubscription message) returns error? {
@@ -72,24 +83,26 @@ isolated function publishHousekeepingData(string topicName, json payload) return
     check houseKeepingService->'flush();
 }
 
-isolated function getAvailableTopics() returns websubhub:TopicRegistration[]|error {
+isolated function getAvailableTopics() returns websubhub:TopicRegistration[]|error? {
     kafka:ConsumerRecord[] records = check topicDetailsConsumer->poll(1);
-    websubhub:TopicRegistration[] currentTopics = [];
+    io:println("Executing topic-registration extration");
     if (records.length() > 0) {
         kafka:ConsumerRecord lastRecord = records.pop();
         string|error lastPersistedData = string:fromBytes(lastRecord.value);
         if (lastPersistedData is string) {
+            websubhub:TopicRegistration[] currentTopics = [];
             log:printInfo("Last persisted-data set : ", message = lastPersistedData);
             json[] payload =  <json[]> check value:fromJsonString(lastPersistedData);
             foreach var data in payload {
                 websubhub:TopicRegistration topic = check data.cloneWithType(websubhub:TopicRegistration);
                 currentTopics.push(topic);
             }
+            return currentTopics;
         } else {
             log:printError("Error occurred while retrieving topic-details ", err = lastPersistedData.message());
+            return lastPersistedData;
         }
     }
-    return currentTopics;
 }
 
 isolated function getAvailableSubscribers() returns websubhub:VerifiedSubscription[]|error {

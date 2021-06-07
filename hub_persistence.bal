@@ -52,6 +52,7 @@ isolated function notifySubscriber(websubhub:HubClient clientEp, kafka:Consumer 
             }
         }
     }
+    _ = check consumerEp->close(5);
 }
 
 isolated function publishContent(websubhub:UpdateMessage message, string topicName) returns error? {

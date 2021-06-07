@@ -3,7 +3,7 @@ import ballerina/log;
 import ballerina/http;
 import ballerinax/kafka;
 
-isolated map<string> registeredTopics = {};
+isolated map<websubhub:TopicRegistration> registeredTopics = {};
 isolated map<boolean> subscribers = {};
 configurable boolean securityOn = ?;
 
@@ -30,7 +30,6 @@ websubhub:Service hubService = service object {
             if (registeredTopics.hasKey(topicName)) {
                 return error websubhub:TopicRegistrationError("Topic has already registered with the Hub");
             }
-            registeredTopics[topicName] = message.topic;
         }
         error? persistingResult = persistTopicRegistrations(message);
         if (persistingResult is error) {
@@ -49,16 +48,16 @@ websubhub:Service hubService = service object {
         if (securityOn) {
             check authorize(headers, ["deregister_topic"]);
         }
-        self.deregisterTopic(message);
+        check self.deregisterTopic(message);
         return websubhub:TOPIC_DEREGISTRATION_SUCCESS;
     }
 
-    isolated function deregisterTopic(websubhub:TopicRegistration message) {
+    isolated function deregisterTopic(websubhub:TopicRegistration message) returns websubhub:TopicDeregistrationError? {
         log:printInfo("Received topic-deregistration request ", request = message);
         string topicName = generateTopicName(message.topic);
         lock {
-            if (registeredTopics.hasKey(topicName)) {
-                string removedTopic = registeredTopics.remove(topicName);
+            if (!registeredTopics.hasKey(topicName)) {
+                return error websubhub:TopicDeregistrationError("Topic has not been registered in the Hub");
             }
         }
         error? persistingResult = persistTopicDeregistration(message);
