@@ -1,0 +1,15 @@
+FROM adoptopenjdk/openjdk11:alpine-slim
+
+MAINTAINER ayesh almeida
+
+COPY ./wso2is-5.11.0.zip /opt/
+
+RUN unzip /opt/wso2is-5.11.0.zip -d /opt/
+
+RUN chmod 500 /opt/wso2is-5.11.0/bin/*
+
+WORKDIR /opt/wso2is-5.11.0/bin/
+
+CMD ["sh", "wso2server.sh"]
+
+EXPOSE 9443
